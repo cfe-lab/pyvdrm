@@ -4,6 +4,8 @@ from pyvdrm.hivdb import ASI2
 from pyvdrm.vcf import Mutation, MutationSet
 
 def mus(mutations):
+    if mutations == '':
+        return set([])
     return reduce(lambda x, y: x.union(y),
             map(lambda x: set(MutationSet.from_string(x)), mutations.split()))
 
