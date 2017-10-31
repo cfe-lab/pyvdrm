@@ -83,7 +83,7 @@ class AndExpr(AsiExpr):
         if scores == []:
             raise ValueError
 
-        residues = set()
+        residues = set([])
         for s in scores:
             if s.score == False:
                 return Score(False, [])

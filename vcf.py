@@ -28,6 +28,10 @@ class Mutation(object):
 
         return cls(match.group(2), match.group(3), wildtype)
 
+    def setWt(self, seq):
+        '''I really don't like this; please don't actually use this'''
+        self.wildtype = seq[self.pos - 1]
+
     def __repr__(self):
         if self.wildtype:
             return "{}{}{}".format(self.wildtype, self.pos, self.variant)
