@@ -9,5 +9,7 @@ setup(
     author='',
     author_email='',
 
+    packages=(['pyvdrm']),
+    python_requires='>=3',
     install_requires=['pyparsing'],
 )
