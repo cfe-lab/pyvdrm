@@ -12,4 +12,7 @@ setup(
     packages=(['pyvdrm']),
     python_requires='>=3',
     install_requires=['pyparsing'],
+
+    test_suite='nose.collector',
+    tests_require=['nose'],
 )

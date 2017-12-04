@@ -1,5 +1,5 @@
 import unittest
-from vcf import Mutation
+from pyvdrm.vcf import Mutation
 
 class TestMutationParser(unittest.TestCase):
 
