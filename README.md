@@ -1,8 +1,6 @@
 # pyvdrm
 Tools for interpreting drug resistance mutations in viral amino acid sequences
 
-In general, drug resistance mutations
-
 A DRM calling algorithm's `Rule`s should be specified in a context free grammar. It is the intention of this
 package to supply the semantics for the most commonly used operators on sets of
 `Mutation`s, but these can be overloaded.
@@ -31,15 +29,15 @@ There are distinct operations one may want to apply to a rule:
     evaluated
   - **Printing/Transformation** Displaying rules with or without arguments is
     useful for debugging and reporting but addionally for translating a set of
-    rules into other machine readable formats
+    rules into other machine readable formats independent of semantics
   - **Evaluation** Given an set of positional mutations, a rule returns a score
 
-## API
+## API Synopsis
 
-**Algorithm**: the domain specific implementation of a rule grammar
-**Rule**: an instance of the algorithm, initialized with
-**Mutation**: the `vcf` module supports 
-**Score**: the result of evaluating a rule with a set of mutations
+  - **Algorithm**: the domain specific implementation of a rule grammar
+  - **Rule**: an instance of the algorithm, initialized with
+  - **Mutation**: the `vcf` module supports 
+  - **Score**: the result of evaluating a rule with a set of mutations
 
 An _environment_ is a set of Mutations on which a Rule is applied.
 
