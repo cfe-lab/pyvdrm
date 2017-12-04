@@ -1,6 +1,6 @@
 import unittest
 from functools import reduce
-from pyvdrm.hivdb import ASI2
+from pyvdrm.asi2 import ASI2
 from pyvdrm.vcf import Mutation, MutationSet
 
 def mus(mutations):
@@ -8,6 +8,7 @@ def mus(mutations):
         return set([])
     return reduce(lambda x, y: x.union(y),
             map(lambda x: set(MutationSet.from_string(x)), mutations.split()))
+
 
 class TestRuleParser(unittest.TestCase):
 
@@ -50,6 +51,7 @@ class TestRuleParser(unittest.TestCase):
                           MAX (101P => 40, 101E => 30, 101HN => 15, 101Q => 5) )"
         ASI2(q)
 
+
 class TestRuleSemantics(unittest.TestCase):
     
     def test_score_from(self):
@@ -91,6 +93,7 @@ class TestRuleSemantics(unittest.TestCase):
         rule = ASI2("SELECT EXACTLY 1 FROM (2T, 7Y)")
         score = rule(mus("2T 7Y 1G"))
 
+
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):
         for line in open("HIVDB.rules"):
@@ -121,5 +124,7 @@ class TestActualRules(unittest.TestCase):
         self.assertEqual(rule(mus("41L 210W 215F")), 60)
         self.assertEqual(rule(mus("40F 210W 215Y")), 25)
         self.assertEqual(rule(mus("40F 67G 215Y")), 15) 
+
+
 if __name__ == '__main__':
     unittest.main()
