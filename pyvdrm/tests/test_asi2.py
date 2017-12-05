@@ -96,7 +96,7 @@ class TestRuleSemantics(unittest.TestCase):
 
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):
-        for line in open("HIVDB.rules"):
+        for line in open("pyvdrm/tests/HIVDB.rules"):
             print(line)
             r = ASI2(line.strip())
 
