@@ -2,6 +2,21 @@
 Classes for dealing with amino acid mutation sets
 '''
 import re
+import sys
+
+def call_mutations(reference, sample):
+    '''Construct a set of Mutations given two aligned amino acid sequences'''
+    mus = list()
+
+    if len(reference) != len(sample):
+        print("Reference and sample have mismatched lengths", file=sys.stderr)
+
+    i = 1
+    for ref, alt in zip(reference, sample):
+        if ref != alt:
+            mus.add(Mutation.from_string("{}{}{}".format(ref, i, alt)))
+        i += 1
+    return mus
 
 class Mutation(object):
     '''Mutation has optional wildtype, position, and call'''
