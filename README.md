@@ -31,7 +31,7 @@ There are distinct operations one may want to apply to a rule:
   - **Validation** Malformed rules should be detected before the mutations are 
     evaluated
   - **Printing/Transformation** Displaying rules with or without arguments is
-    useful for debugging and reporting but addionally for translating a set of
+    useful for debugging and reporting but additionally for translating a set of
     rules into other machine readable formats independent of semantics
   - **Evaluation** Given an set of positional mutations, a rule returns a score
 
