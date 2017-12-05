@@ -1,4 +1,7 @@
 # pyvdrm
+[![Build
+Status](https://travis-ci.org/jeff-k/pyvdrm.svg?branch=master)](https://travis-ci.org/jeff-k/pyvdrm)
+
 Tools for interpreting drug resistance mutations in viral amino acid sequences
 
 A DRM calling algorithm's `Rule`s should be specified in a context free grammar. It is the intention of this
