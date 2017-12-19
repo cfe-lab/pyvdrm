@@ -13,6 +13,6 @@ setup(
     python_requires='>=3',
     install_requires=['pyparsing'],
 
-    test_suite='nose.collector',
-    tests_require=['nose'],
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest']
 )
