@@ -1,25 +1,26 @@
-'''Asi2 specification
-'''
+"""Asi2 specification
+"""
 
 from abc import ABCMeta, abstractmethod
+
 
 class AsiParseError(Exception):
     pass
 
 
 class DRMParser(metaclass=ABCMeta):
-    '''abstract class for DRM rule parsers/evaluators'''
+    """abstract class for DRM rule parsers/evaluators"""
 
     def __init__(self, rule):
-        '''drug resistance mutation callers are initialized with rule strings,
+        """drug resistance mutation callers are initialized with rule strings,
             the initialized parser has a callable decision tree object
-        '''
+        """
         self.rule = rule
         self.dtree, *rest = self.parser(rule)
 
     @abstractmethod
     def parser(self, rule_string):
-        '''The parser returns a decision tree based on the rule string'''
+        """The parser returns a decision tree based on the rule string"""
         pass
 
     def __call__(self, mutations):
@@ -33,13 +34,13 @@ class DRMParser(metaclass=ABCMeta):
 
 
 class AsiExpr(object):
-    '''A callable ASI2 expression'''
+    """A callable ASI2 expression"""
 
     children = []
     label = None
 
-    def __init__(self, label, pos, tokens):
-        '''By default we assume the head of the arg list is the operation'''
+    def __init__(self, _label, _pos, tokens):
+        """By default we assume the head of the arg list is the operation"""
 
         self.typecheck(tokens.asList())
         self.children = tokens
@@ -48,22 +49,23 @@ class AsiExpr(object):
             self.label = str(type(self))
 
     def typecheck(self, tokens):
-        '''Override typecheck method to define runtime errors'''
+        """Override typecheck method to define runtime errors"""
         pass
 
     def __call__(self, args):
-        '''Evaluate child tokens with args'''
+        """Evaluate child tokens with args"""
         return self.children(args)
 
     def __repr__(self):
-        '''Pretty print syntax tree'''
+        """Pretty print syntax tree"""
         return str(type(self))
 
 
 class AsiBinaryExpr(AsiExpr):
-    '''Subclass with syntactic sugar for boolean ops'''
+    """Subclass with syntactic sugar for boolean ops"""
 
     def __init__(self, label, pos, tokens):
+        super().__init__(label, pos, tokens)
         self.children = tokens[0]
 
     def typecheck(self, tokens):
@@ -76,7 +78,7 @@ class AsiBinaryExpr(AsiExpr):
 
 
 class AsiUnaryExpr(AsiExpr):
-    '''Subclass for atoms and unary ops'''
+    """Subclass for atoms and unary ops"""
 
     def typecheck(self, tokens):
         if isinstance(tokens[0], list):

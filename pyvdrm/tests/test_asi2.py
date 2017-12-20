@@ -3,48 +3,49 @@ from functools import reduce
 from pyvdrm.asi2 import ASI2
 from pyvdrm.vcf import Mutation, MutationSet
 
+
 def mus(mutations):
     if mutations == '':
         return set([])
     return reduce(lambda x, y: x.union(y),
-            map(lambda x: set(MutationSet.from_string(x)), mutations.split()))
+                  map(lambda x: set(MutationSet.from_string(x)), mutations.split()))
 
 
+# noinspection SqlNoDataSourceInspection,SqlDialectInspection
 class TestRuleParser(unittest.TestCase):
 
     def test_stanford_ex1(self):
         ASI2("151M OR 69i")
+
     def test_stanford_ex2(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
         m1 = Mutation(41, 'L')
         m2 = Mutation(67, 'N')
-        m3 = Mutation(70 ,'N')
+        m3 = Mutation(70, 'N')
         self.assertTrue(rule([m1, m2]))
         self.assertFalse(rule([m1, m3]))
 
     def test_stanford_ex3(self):
         ASI2("SELECT ATLEAST 2 AND NOTMORETHAN 2 FROM (41L, 67N, 70R, 210W, 215FY, 219QE)")
+
     def test_stanford_ex4(self):
         ASI2("215FY AND NOT 184VI")
 
-
     def test_stanford_rest(self):
-        examples = [
-        "SCORE FROM (65R => 20, 74V => 20, 184VI => 20)",
-        "151M AND EXCLUDE 69i",
-#        "69(NOT TDN)",
-        "215F OR 215Y",
-        "SCORE FROM (101P => 40, 101E => 30, 101HN => 15, 101Q => 5 )",
-        "SCORE FROM ( MAX  (101P => 40, 101E => 30, 101HN => 15, 101Q => 5 ))",
-        "(184V AND 115F) => 20"
-        "3N AND 9N",
-        "2N OR 9N AND 2N",
-        "3N AND (2N AND (4N OR 2N))",
-        ]
+        examples = ["SCORE FROM (65R => 20, 74V => 20, 184VI => 20)",
+                    "151M AND EXCLUDE 69i",
+                    # "69(NOT TDN)",
+                    "215F OR 215Y",
+                    "SCORE FROM (101P => 40, 101E => 30, 101HN => 15, 101Q => 5 )",
+                    "SCORE FROM ( MAX  (101P => 40, 101E => 30, 101HN => 15, 101Q => 5 ))",
+                    "(184V AND 115F) => 20"
+                    "3N AND 9N",
+                    "2N OR 9N AND 2N",
+                    "3N AND (2N AND (4N OR 2N))"]
 
         for ex in examples:
-            print(ex)
             x = ASI2(ex)
+            self.assertEqual(ex, x.rule)
 
     def test_asi2_compat(self):
         q = "SCORE FROM ( 98G => 10, 100I => 40,\
@@ -52,6 +53,7 @@ class TestRuleParser(unittest.TestCase):
         ASI2(q)
 
 
+# noinspection SqlNoDataSourceInspection,SqlDialectInspection
 class TestRuleSemantics(unittest.TestCase):
     
     def test_score_from(self):
@@ -67,7 +69,6 @@ class TestRuleSemantics(unittest.TestCase):
         rule = ASI2("SCORE FROM (MAX (100G => -10, 101D => -20, 102D => 30))")
         self.assertEqual(rule(mus("100G 101D")), -10)
         self.assertEqual(rule(mus("10G 11D")), False) 
-
 
     def test_bool_and(self):
         rule = ASI2("1G AND (2T AND 7Y)")
@@ -92,13 +93,14 @@ class TestRuleSemantics(unittest.TestCase):
     def test_score_from_exactly(self):
         rule = ASI2("SELECT EXACTLY 1 FROM (2T, 7Y)")
         score = rule(mus("2T 7Y 1G"))
+        self.assertEqual(0, score)
 
 
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):
         for line in open("pyvdrm/tests/HIVDB.rules"):
-            print(line)
-            r = ASI2(line.strip())
+            r = ASI2(line)
+            self.assertEqual(line, r.rule)
 
     def test_chained_and(self):
         rule = ASI2("""

@@ -1,6 +1,6 @@
-'''
+"""
 ASI2 Parser definition
-'''
+"""
 
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
@@ -8,15 +8,17 @@ from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
 from pyvdrm.drm import AsiExpr, AsiBinaryExpr, AsiUnaryExpr, DRMParser
 from pyvdrm.vcf import MutationSet
 
+
 def maybe_foldl(func, noneable):
-    '''Safely fold a function over a potentially empty list of
-    potentially null values'''
+    """Safely fold a function over a potentially empty list of
+    potentially null values"""
     if noneable is None:
         return None
     clean = [x for x in noneable if x is not None]
-    if clean == []:
+    if not clean:
         return None
     return reduce(func, clean)
+
 
 def maybe_map(func, noneable):
     if noneable is None:
@@ -29,14 +31,14 @@ def maybe_map(func, noneable):
         if result is None:
             continue
         r_list.append(result)
-    if r_list == []:
+    if not r_list:
         return None
     return r_list
 
 
 @total_ordering
 class Score(object):
-    '''Encapsulate a score and the residues that support it'''
+    """Encapsulate a score and the residues that support it"""
 
     residues = set([])
     score = None
@@ -68,24 +70,24 @@ class Score(object):
 
 
 class Negate(AsiUnaryExpr):
-    '''Unary negation of boolean child'''
+    """Unary negation of boolean child"""
     def __call__(self, mutations):
         arg = self.children(mutations)
         return Score(not arg.score, arg.residues)
 
 
 class AndExpr(AsiExpr):
-    '''Fold boolean AND on children'''
+    """Fold boolean AND on children"""
 
     def __call__(self, mutations):
         scores = map(lambda f: f(mutations), self.children[0])
         scores = [Score(False, []) if s is None else s for s in scores]
-        if scores == []:
+        if not scores:
             raise ValueError
 
         residues = set([])
         for s in scores:
-            if s.score == False:
+            if not s.score:
                 return Score(False, [])
             residues = residues | s.residues
 
@@ -93,7 +95,7 @@ class AndExpr(AsiExpr):
 
 
 class OrExpr(AsiBinaryExpr):
-    '''Boolean OR on children (binary only)'''
+    """Boolean OR on children (binary only)"""
 
     def __call__(self, mutations):
         arg1, arg2 = self.children
@@ -111,9 +113,10 @@ class OrExpr(AsiBinaryExpr):
 
 
 class EqualityExpr(AsiExpr):
-    '''ASI2 inequality expressions'''
+    """ASI2 inequality expressions"""
 
     def __init__(self, label, pos, children):
+        super().__init__(label, pos, children)
         self.operation, limit = children
         self.limit = int(limit)
 
@@ -132,10 +135,9 @@ class EqualityExpr(AsiExpr):
 
 
 class ScoreExpr(AsiExpr):
-    '''Score expressions propagate DRM scores'''
+    """Score expressions propagate DRM scores"""
 
     def __call__(self, mutations):
-        operation, score = (None, None)
         if len(self.children) == 3:
             operation, minus, score = self.children
             if minus != '-':
@@ -162,7 +164,7 @@ class ScoreExpr(AsiExpr):
 
 
 class ScoreList(AsiExpr):
-    '''Lists of scores are either summed or maxed'''
+    """Lists of scores are either summed or maxed"""
 
     def __call__(self, mutations):
         operation, *rest = self.children
@@ -170,15 +172,15 @@ class ScoreList(AsiExpr):
             return maybe_foldl(max, [f(mutations) for f in rest])
 
         # the default operation is sum
-        return maybe_foldl(lambda x,y: x+y, [f(mutations) for f in self.children])
+        return maybe_foldl(lambda x, y: x+y, [f(mutations) for f in self.children])
 
 
 class SelectFrom(AsiExpr):
-    '''Return True if some number of mutations match'''
+    """Return True if some number of mutations match"""
 
     def typecheck(self, tokens):
-#        if type(tokens[0]) != EqualityExpr:
-#            raise TypeError
+        # if type(tokens[0]) != EqualityExpr:
+        #     raise TypeError()
         pass
 
     def __call__(self, mutations):
@@ -190,27 +192,27 @@ class SelectFrom(AsiExpr):
 
         if operation(passing):
             return Score(True, maybe_foldl(
-                lambda x,y: x.residues.union(y.residues), scored))
+                lambda x, y: x.residues.union(y.residues), scored))
         else:
             return None
 
 
 class AsiScoreCond(AsiExpr):
-    '''Score condition'''
+    """Score condition"""
 
     label = "ScoreCond"
 
     def __call__(self, args):
-        '''Score conditions evaluate a list of expressions and sum scores'''
-        return maybe_foldl(lambda x,y: x+y, map(lambda x: x(args), self.children))
+        """Score conditions evaluate a list of expressions and sum scores"""
+        return maybe_foldl(lambda x, y: x+y, map(lambda x: x(args), self.children))
 
 
 class AsiMutations(object):
-    '''List of mutations given an ambiguous pattern'''
+    """List of mutations given an ambiguous pattern"""
 
     def __init__(self, pos, label, args):
-        '''Initialize set of mutations from a potentially ambiguous residue
-        '''
+        """Initialize set of mutations from a potentially ambiguous residue
+        """
         if pos and label:
             pass
         self.mutations = MutationSet.from_string(''.join(args))
@@ -226,7 +228,7 @@ class AsiMutations(object):
 
 
 class ASI2(DRMParser):
-    '''ASI2 Syntax definition'''
+    """ASI2 Syntax definition"""
 
     def parser(self, rule):
 
@@ -241,7 +243,7 @@ class ASI2(DRMParser):
 
         and_ = Literal('AND').suppress()
         or_ = Literal('OR').suppress()
-        #min_ = Literal('MIN')
+        # min_ = Literal('MIN')
 
         notmorethan = Literal('NOTMORETHAN')
         l_par = Literal('(').suppress()
@@ -256,8 +258,8 @@ class ASI2(DRMParser):
         not_.setParseAction(Negate)
 
         residue = mutation | not_
-#            integer + l_par + not_ + Regex(r'[A-Z]+') + r_par
-            # roll this next rule into the mutation object
+        # integer + l_par + not_ + Regex(r'[A-Z]+') + r_par
+        # roll this next rule into the mutation object
 
         # Syntax of ASI expressions
         excludestatement = except_ + residue
@@ -286,11 +288,11 @@ class ASI2(DRMParser):
         scoreitem = booleancondition + mapper + Optional(Literal('-')) + integer
         scoreitem.setParseAction(ScoreExpr)
         scorelist = max_ + l_par + delimitedList(scoreitem) + r_par |\
-                    delimitedList(scoreitem)
+            delimitedList(scoreitem)
         scorelist.setParseAction(ScoreList)
 
         scorecondition = Literal('SCORE FROM').suppress() +\
-                l_par + delimitedList(scorelist) + r_par
+            l_par + delimitedList(scorelist) + r_par
 
         scorecondition.setParseAction(AsiScoreCond)
 

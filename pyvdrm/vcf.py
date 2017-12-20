@@ -1,11 +1,12 @@
-'''
+"""
 Classes for dealing with amino acid mutation sets
-'''
+"""
 import re
 import sys
 
+
 def call_mutations(reference, sample):
-    '''Construct a set of Mutations given two aligned amino acid sequences'''
+    """Construct a set of Mutations given two aligned amino acid sequences"""
     mus = list()
 
     if len(reference) != len(sample):
@@ -14,12 +15,13 @@ def call_mutations(reference, sample):
     i = 1
     for ref, alt in zip(reference, sample):
         if ref != alt:
-            mus.add(Mutation.from_string("{}{}{}".format(ref, i, alt)))
+            mus.append(Mutation.from_string("{}{}{}".format(ref, i, alt)))
         i += 1
     return mus
 
+
 class Mutation(object):
-    '''Mutation has optional wildtype, position, and call'''
+    """Mutation has optional wildtype, position, and call"""
 
     def __init__(self, pos, variant, wildtype=None):
 
@@ -29,7 +31,7 @@ class Mutation(object):
 
     @classmethod
     def from_string(cls, residue):
-        '''Parse mutation from string'''
+        """Parse mutation from string"""
         match = re.match(r"([A-Z]?)(\d+)([idA-Z])", residue)
         if match is None:
             # raise a proper pyvcf exception
@@ -43,8 +45,8 @@ class Mutation(object):
 
         return cls(match.group(2), match.group(3), wildtype)
 
-    def setWt(self, seq):
-        '''I really don't like this; please don't actually use this'''
+    def extract_wildtype(self, seq):
+        """I really don't like this; please don't actually use this"""
         self.wildtype = seq[self.pos - 1]
 
     def __repr__(self):
@@ -70,7 +72,7 @@ class Mutation(object):
 
 
 class MutationSet(object):
-    '''Handle sets of mutations at a position'''
+    """Handle sets of mutations at a position"""
 
     def __init__(self, mutations):
 
@@ -97,8 +99,8 @@ class MutationSet(object):
 
     @classmethod
     def from_string(cls, residue):
-        '''Syntactic sugar for specifying multiple variants
-        '''
+        """Syntactic sugar for specifying multiple variants
+        """
 
         match = re.match(r"([A-Z]?)(\d+)([idA-Z]*)", residue)
         if match is None:
