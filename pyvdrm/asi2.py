@@ -215,7 +215,7 @@ class AsiMutations(object):
         """
         if pos and label:
             pass
-        self.mutations = MutationSet.from_string(''.join(args))
+        self.mutations = MutationSet(''.join(args))
 
     def __repr__(self):
         return str(self.mutations)

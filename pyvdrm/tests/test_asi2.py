@@ -8,7 +8,7 @@ def mus(mutations):
     if mutations == '':
         return set([])
     return reduce(lambda x, y: x.union(y),
-                  map(lambda x: set(MutationSet.from_string(x)), mutations.split()))
+                  map(lambda x: set(MutationSet(x)), mutations.split()))
 
 
 # noinspection SqlNoDataSourceInspection,SqlDialectInspection
@@ -19,9 +19,9 @@ class TestRuleParser(unittest.TestCase):
 
     def test_stanford_ex2(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
-        m1 = Mutation(41, 'L')
-        m2 = Mutation(67, 'N')
-        m3 = Mutation(70, 'N')
+        m1 = Mutation('41L')
+        m2 = Mutation('67N')
+        m3 = Mutation('70N')
         self.assertTrue(rule([m1, m2]))
         self.assertFalse(rule([m1, m3]))
 
