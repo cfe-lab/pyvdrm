@@ -77,6 +77,12 @@ class TestMutation(unittest.TestCase):
             if set1 == set2:
                 pass
 
+    def test_immutable(self):
+        m = Mutation('Q1A')
+
+        with self.assertRaises(AttributeError):
+            m.pos = 2
+
 
 class TestMutationSet(unittest.TestCase):
     def test_init_text(self):
@@ -251,6 +257,12 @@ class TestMutationSet(unittest.TestCase):
             mutations = MutationSet(text)
             self.assertIsNone(mutations.wildtype)
 
+    def test_immutable(self):
+        ms = MutationSet('Q80KR')
+
+        with self.assertRaises(AttributeError):
+            ms.wildtype = 'D'
+
 
 class TestVariantCalls(unittest.TestCase):
     def test_init_text(self):
@@ -264,22 +276,21 @@ class TestVariantCalls(unittest.TestCase):
     def test_init_single_sequence(self):
         reference = 'ACHE'
         sample = 'ICRE'
-        expected_mutation_sets = {MutationSet('A1I'), MutationSet('H3R')}
+        expected_calls = VariantCalls('A1I C2C H3R E4E')
 
         calls = VariantCalls(reference=reference, sample=sample)
 
         self.assertEqual(reference, calls.reference)
-        self.assertEqual(expected_mutation_sets, calls.mutation_sets)
+        self.assertEqual(expected_calls, calls)
 
     def test_init_multiple_sequences(self):
         reference = 'ACHE'
         sample = ['IN', 'C', 'HR', 'E']
-        expected_mutation_sets = {MutationSet('A1IN'), MutationSet('H3HR')}
+        expected_calls = VariantCalls('A1IN C2C H3HR E4E')
 
         calls = VariantCalls(reference=reference, sample=sample)
 
-        self.assertEqual(reference, calls.reference)
-        self.assertEqual(expected_mutation_sets, calls.mutation_sets)
+        self.assertEqual(expected_calls, calls)
 
     def test_init_bad_length(self):
         reference = 'ACHE'
@@ -288,6 +299,16 @@ class TestVariantCalls(unittest.TestCase):
         with self.assertRaisesRegex(
                 ValueError, r'Reference length was 4 and sample length was 5\.'):
             VariantCalls(reference=reference, sample=sample)
+
+    def test_init_with_reference(self):
+        expected_reference = 'ASH'
+        expected_repr = "VariantCalls('A1IL H3R')"
+
+        calls = VariantCalls('1IL 3R', reference=expected_reference)
+        r = repr(calls)
+
+        self.assertEqual(expected_reference, calls.reference)
+        self.assertEqual(expected_repr, r)
 
     def test_repr(self):
         expected_repr = "VariantCalls('A1IL H3R')"
@@ -324,6 +345,28 @@ class TestVariantCalls(unittest.TestCase):
         self.assertEqual(hash1, hash2)
         self.assertNotEqual(hash1, hash3)
         self.assertNotEqual(hash1, hash4)
+
+    def test_iter(self):
+        calls = VariantCalls('A1IL H3R')
+        expected_mutation_sets = {MutationSet('A1IL'), MutationSet('H3R')}
+
+        mutation_sets = set(calls)
+
+        self.assertEqual(expected_mutation_sets, mutation_sets)
+
+    def test_in(self):
+        calls = VariantCalls('A1IL H3R')
+        mutation_set1 = MutationSet('H3R')
+        mutation_set2 = MutationSet('H4R')
+
+        self.assertIn(mutation_set1, calls)
+        self.assertNotIn(mutation_set2, calls)
+
+    def test_immutable(self):
+        calls = VariantCalls('A1IL H3R')
+
+        with self.assertRaises(AttributeError):
+            calls.reference = 'ASH'
 
 
 if __name__ == '__main__':

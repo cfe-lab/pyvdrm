@@ -2,10 +2,14 @@
 Classes for dealing with amino acid mutation sets
 """
 import re
+from collections import namedtuple
 from operator import attrgetter
 
 
-class VariantCalls:
+class VariantCalls(namedtuple('VariantCalls', 'mutation_sets reference')):
+    # TODO: remove all these __init__ methods once PyCharm bug is fixed.
+    # https://youtrack.jetbrains.com/issue/PY-26834
+    # noinspection PyUnusedLocal
     def __init__(self, text=None, reference=None, sample=None):
         """ Construct a set of Mutations given two aligned amino acid sequences
 
@@ -13,10 +17,15 @@ class VariantCalls:
         :param sample: amino acids present at each position, either a string or
         a list of strings
         """
-        self.reference = reference
+        # noinspection PyArgumentList
+        super().__init__()
+
+    def __new__(cls, text=None, reference=None, sample=None):
         if text is not None:
             terms = text.split()
-            self.mutation_sets = frozenset(MutationSet(term) for term in terms)
+            mutation_sets = frozenset(
+                MutationSet(term, reference=reference)
+                for term in terms)
         else:
             if len(reference) != len(sample):
                 raise ValueError(
@@ -24,10 +33,14 @@ class VariantCalls:
                         len(reference),
                         len(sample)))
 
-            self.mutation_sets = {MutationSet(pos=i, variants=alt, wildtype=ref)
-                                  for i, (alt, ref) in enumerate(zip(sample, reference),
-                                                                 1)
-                                  if ref != alt}
+            mutation_sets = {MutationSet(pos=i, variants=alt, wildtype=ref)
+                             for i, (alt, ref) in enumerate(zip(sample,
+                                                                reference),
+                                                            1)}
+        # noinspection PyArgumentList
+        return super().__new__(cls,
+                               mutation_sets=mutation_sets,
+                               reference=reference)
 
     def __str__(self):
         return ' '.join(map(str, sorted(self.mutation_sets,
@@ -40,23 +53,23 @@ class VariantCalls:
     def __eq__(self, other):
         return self.mutation_sets == other.mutation_sets
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __hash__(self):
         return hash(self.mutation_sets)
 
+    def __iter__(self):
+        return iter(self.mutation_sets)
 
-class Mutation(object):
+    def __contains__(self, item):
+        return item in self.mutation_sets
+
+
+class Mutation(namedtuple('Mutation', 'pos variant wildtype')):
     """Mutation has optional wildtype, position, and call"""
 
-    def __init__(self, text=None, wildtype=None, pos=None, variant=None):
-        """ Initialize.
-
-        :param str text: will be parsed for wildtype (optional), position,
-            and variant
-        :param str wildtype: amino acid abbreviation for wild type
-        :param str|int pos: position
-        :param str variant: single amino acid abbreviation, or 'i' for
-            insertion, or 'd' for deletion
-        """
+    def __new__(cls, text=None, wildtype=None, pos=None, variant=None):
         if text is not None:
             match = re.match(r"([A-Z]?)(\d+)([idA-Z])", text)
             if match is None:
@@ -68,13 +81,25 @@ class Mutation(object):
                 raise ValueError('Mutation text only allows one variant.')
 
             wildtype, pos, variant = match.groups()
-        self.wildtype = wildtype or None
-        self.pos = int(pos)
-        self.variant = variant
+        # noinspection PyArgumentList
+        return super().__new__(cls,
+                               pos=int(pos),
+                               variant=variant,
+                               wildtype=wildtype or None)
 
-    def extract_wildtype(self, seq):
-        """I really don't like this; please don't actually use this"""
-        self.wildtype = seq[self.pos - 1]
+    # noinspection PyUnusedLocal
+    def __init__(self, text=None, wildtype=None, pos=None, variant=None):
+        """ Initialize.
+
+        :param str text: will be parsed for wildtype (optional), position,
+            and variant
+        :param str wildtype: amino acid abbreviation for wild type
+        :param str|int pos: position
+        :param str variant: single amino acid abbreviation, or 'i' for
+            insertion, or 'd' for deletion
+        """
+        # noinspection PyArgumentList
+        super().__init__()
 
     def __repr__(self):
         text = str(self)
@@ -100,36 +125,31 @@ class Mutation(object):
         # now that we agree on the wt and position
         return (self.pos, self.variant) == (other.pos, other.variant)
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __hash__(self):
         return hash((self.pos, self.variant))
 
 
-class MutationSet(object):
+class MutationSet(namedtuple('MutationSet', 'pos mutations wildtype')):
     """Handle sets of mutations at a position"""
 
-    def __init__(self,
-                 text=None,
-                 wildtype=None,
-                 pos=None,
-                 variants=None,
-                 mutations=None):
-        """ Initialize
-
-        :param str text: will be parsed for wildtype (optional), position,
-            and variants
-        :param str wildtype: amino acid abbreviation for wild type
-        :param int|str pos: position
-        :param str variants: zero or more amino acid abbreviations, or 'i' for
-            insertion, or 'd' for deletion
-        :param mutations: a sequence of Mutation objects, with matching
-            positions and wild types
-        """
+    def __new__(cls,
+                text=None,
+                wildtype=None,
+                pos=None,
+                variants=None,
+                mutations=None,
+                reference=None):
         if text:
             match = re.match(r"([A-Z]?)(\d+)([idA-Z]*)", text)
             if match is None:
                 raise ValueError
 
             wildtype, pos, variants = match.groups()
+            if reference:
+                wildtype = reference[int(pos)-1]
 
         if variants:
             mutations = frozenset(Mutation(wildtype=wildtype,
@@ -159,18 +179,41 @@ class MutationSet(object):
             pos = positions.pop()
             if wildtypes:
                 wildtype = wildtypes.pop()
-        self.wildtype = wildtype or None
-        self.pos = int(pos)
-        self.mutations = mutations
+        # noinspection PyArgumentList
+        return super().__new__(cls,
+                               wildtype=wildtype or None,
+                               pos=int(pos),
+                               mutations=mutations)
+
+    # noinspection PyUnusedLocal
+    def __init__(self,
+                 text=None,
+                 wildtype=None,
+                 pos=None,
+                 variants=None,
+                 mutations=None,
+                 reference=None):
+        """ Initialize
+
+        :param str text: will be parsed for wildtype (optional), position,
+            and variants
+        :param str wildtype: amino acid abbreviation for wild type
+        :param int|str pos: position
+        :param str variants: zero or more amino acid abbreviations, or 'i' for
+            insertion, or 'd' for deletion
+        :param mutations: a sequence of Mutation objects, with matching
+            positions and wild types
+        :param str reference: alternative source for wildtype, based on
+            pos - 1
+        """
+        # noinspection PyArgumentList
+        super().__init__()
 
     def __len__(self):
         return len(self.mutations)
 
     def __contains__(self, call):
-        for mutation in self.mutations:
-            if call == mutation:
-                return True
-        return False
+        return call in self.mutations
 
     def __eq__(self, other):
         if self.pos != other.pos:
@@ -184,18 +227,14 @@ class MutationSet(object):
                 raise ValueError(message)
         return self.mutations == other.mutations
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __hash__(self):
         return hash((self.pos, self.mutations))
 
     def __iter__(self):
-        self._mu_iter = list(self.mutations).__iter__()
-        return self._mu_iter
-
-    def __next__(self):
-        return self._mu_iter.__next__()
-
-    def __reversed__(self):
-        return list(self.mutations).__reversed__()
+        return iter(self.mutations)
 
     def __str__(self):
         text = self.wildtype or ''
