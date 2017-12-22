@@ -44,6 +44,11 @@ class Score(object):
     score = None
 
     def __init__(self, score, residues):
+        """ Initialize.
+
+        :param bool|float score: value of the score
+        :param residues: sequence of Mutations
+        """
         self.score = score
         self.residues = set(residues)
 
@@ -54,7 +59,7 @@ class Score(object):
         return Score(self.score - other.score, self.residues | other.residues)
 
     def __repr__(self):
-        return str(self.score)
+        return "Score({!r}, {!r})".format(self.score, self.residues)
 
     def __eq__(self, other):
         return self.score == other.score
@@ -130,9 +135,6 @@ class EqualityExpr(AsiExpr):
 
         raise NotImplementedError
 
-    def __repr__(self):
-        return "({} {})".format(self.operation, self.limit)
-
 
 class ScoreExpr(AsiExpr):
     """Score expressions propagate DRM scores"""
@@ -157,10 +159,6 @@ class ScoreExpr(AsiExpr):
         if result.score is False:
             return Score(0, [])
         return Score(score, result.residues)
-
-    def __repr__(self):
-        operation, score = self.children
-        return "{}=>{}".format(str(operation), str(score))
 
 
 class ScoreList(AsiExpr):
@@ -210,15 +208,15 @@ class AsiScoreCond(AsiExpr):
 class AsiMutations(object):
     """List of mutations given an ambiguous pattern"""
 
-    def __init__(self, pos, label, args):
+    def __init__(self, _label=None, _pos=None, args=None):
         """Initialize set of mutations from a potentially ambiguous residue
         """
-        if pos and label:
-            pass
-        self.mutations = MutationSet(''.join(args))
+        self.mutations = args and MutationSet(''.join(args))
 
     def __repr__(self):
-        return str(self.mutations)
+        if self.mutations is None:
+            return "AsiMutations()"
+        return "AsiMutations(args={!r})".format(str(self.mutations))
 
     def __call__(self, env):
         intersection = set(env) & self.mutations.mutations

@@ -1,6 +1,6 @@
 import unittest
 from functools import reduce
-from pyvdrm.asi2 import ASI2
+from pyvdrm.asi2 import ASI2, AsiMutations, Score
 from pyvdrm.vcf import Mutation, MutationSet
 
 
@@ -126,6 +126,55 @@ class TestActualRules(unittest.TestCase):
         self.assertEqual(rule(mus("41L 210W 215F")), 60)
         self.assertEqual(rule(mus("40F 210W 215Y")), 25)
         self.assertEqual(rule(mus("40F 67G 215Y")), 15) 
+
+
+class TestAsiMutations(unittest.TestCase):
+    def test_init_args(self):
+        expected_mutation_set = MutationSet('Q80KR')
+        m = AsiMutations(args='Q80KR')
+
+        self.assertEqual(expected_mutation_set, m.mutations)
+        self.assertEqual(expected_mutation_set.wildtype, m.mutations.wildtype)
+
+    def test_init_none(self):
+        m = AsiMutations()
+
+        self.assertIsNone(m.mutations)
+
+    def test_repr(self):
+        expected_repr = "AsiMutations(args='Q80KR')"
+        m = AsiMutations(args='Q80KR')
+
+        r = repr(m)
+
+        self.assertEqual(expected_repr, r)
+
+    def test_repr_none(self):
+        expected_repr = "AsiMutations()"
+        m = AsiMutations()
+
+        r = repr(m)
+
+        self.assertEqual(expected_repr, r)
+
+
+class TestScore(unittest.TestCase):
+    def test_init(self):
+        expected_value = 10
+        expected_mutations = {Mutation('A23R')}
+
+        score = Score(expected_value, expected_mutations)
+
+        self.assertEqual(expected_value, score.score)
+        self.assertEqual(expected_mutations, score.residues)
+
+    def test_repr(self):
+        expected_repr = "Score(10, {Mutation('A23R')})"
+        score = Score(10, {Mutation('A23R')})
+
+        r = repr(score)
+
+        self.assertEqual(expected_repr, r)
 
 
 if __name__ == '__main__':

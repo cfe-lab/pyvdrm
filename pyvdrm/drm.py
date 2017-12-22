@@ -56,10 +56,6 @@ class AsiExpr(object):
         """Evaluate child tokens with args"""
         return self.children(args)
 
-    def __repr__(self):
-        """Pretty print syntax tree"""
-        return str(type(self))
-
 
 class AsiBinaryExpr(AsiExpr):
     """Subclass with syntactic sugar for boolean ops"""
