@@ -37,6 +37,13 @@ class VariantCalls(namedtuple('VariantCalls', 'mutation_sets reference')):
                              for i, (alt, ref) in enumerate(zip(sample,
                                                                 reference),
                                                             1)}
+        positions = set()
+        for mutation_set in mutation_sets:
+            if mutation_set.pos in positions:
+                message = 'Multiple mutation sets at position {}.'.format(
+                    mutation_set.pos)
+                raise ValueError(message)
+            positions.add(mutation_set.pos)
         # noinspection PyArgumentList
         return super().__new__(cls,
                                mutation_sets=mutation_sets,
@@ -61,6 +68,9 @@ class VariantCalls(namedtuple('VariantCalls', 'mutation_sets reference')):
 
     def __iter__(self):
         return iter(self.mutation_sets)
+
+    def __len__(self):
+        return len(self.mutation_sets)
 
     def __contains__(self, item):
         return item in self.mutation_sets
@@ -143,9 +153,11 @@ class MutationSet(namedtuple('MutationSet', 'pos mutations wildtype')):
                 mutations=None,
                 reference=None):
         if text:
-            match = re.match(r"([A-Z]?)(\d+)([idA-Z]*)", text)
+            match = re.match(r"([A-Z]?)(\d+)([idA-Z]*)$", text)
             if match is None:
-                raise ValueError
+                message = 'MutationSet text expects wild type (optional), ' \
+                          'position, and zero or more variants.'
+                raise ValueError(message)
 
             wildtype, pos, variants = match.groups()
             if reference:
@@ -157,7 +169,7 @@ class MutationSet(namedtuple('MutationSet', 'pos mutations wildtype')):
                                            variant=variant)
                                   for variant in variants)
         else:
-            mutations = frozenset(mutations)
+            mutations = frozenset(mutations or tuple())
             positions = {mutation.pos for mutation in mutations}
             wildtypes = {mutation.wildtype for mutation in mutations}
             if pos is not None:

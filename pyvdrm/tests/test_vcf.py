@@ -203,6 +203,15 @@ class TestMutationSet(unittest.TestCase):
                                     r'Multiple wildtypes found: Q, R\.'):
             MutationSet(mutations=mutations)
 
+    def test_init_bad_text(self):
+        expected_message = \
+            r'MutationSet text expects wild type \(optional\), position, and ' \
+            r'zero or more variants\.'
+        for bad_text in ('!20A', '20Ac', 'r20Q'):
+            with self.subTest(bad_text):
+                with self.assertRaisesRegex(ValueError, expected_message):
+                    MutationSet(bad_text)
+
     def test_repr(self):
         expected_repr = "MutationSet('Q1AC')"
         ms = MutationSet('Q1AC')
@@ -263,6 +272,19 @@ class TestMutationSet(unittest.TestCase):
         with self.assertRaises(AttributeError):
             ms.wildtype = 'D'
 
+    def test_length(self):
+        self.assertEqual(0, len(MutationSet('A10')))
+        self.assertEqual(1, len(MutationSet('A10I')))
+        self.assertEqual(2, len(MutationSet('A10IL')))
+
+    def test_in(self):
+        ms = MutationSet('A10IL')
+
+        self.assertIn(Mutation('A10I'), ms)
+        self.assertIn(Mutation('A10L'), ms)
+        self.assertIn(Mutation('10L'), ms)
+        self.assertNotIn(Mutation('A10S'), ms)
+
 
 class TestVariantCalls(unittest.TestCase):
     def test_init_text(self):
@@ -299,6 +321,11 @@ class TestVariantCalls(unittest.TestCase):
         with self.assertRaisesRegex(
                 ValueError, r'Reference length was 4 and sample length was 5\.'):
             VariantCalls(reference=reference, sample=sample)
+
+    def test_init_with_duplicate_positions(self):
+        with self.assertRaisesRegex(
+                ValueError, r'Multiple mutation sets at position 10\.'):
+            VariantCalls('H10R A1IN H10C')
 
     def test_init_with_reference(self):
         expected_reference = 'ASH'
@@ -361,6 +388,11 @@ class TestVariantCalls(unittest.TestCase):
 
         self.assertIn(mutation_set1, calls)
         self.assertNotIn(mutation_set2, calls)
+
+    def test_length(self):
+        self.assertEqual(0, len(VariantCalls('')))
+        self.assertEqual(1, len(VariantCalls('A10IL')))
+        self.assertEqual(2, len(VariantCalls('A10IL H3R')))
 
     def test_immutable(self):
         calls = VariantCalls('A1IL H3R')
