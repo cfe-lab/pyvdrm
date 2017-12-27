@@ -219,9 +219,10 @@ class AsiMutations(object):
         return "AsiMutations(args={!r})".format(str(self.mutations))
 
     def __call__(self, env):
-        intersection = set(env) & self.mutations.mutations
-        if len(intersection) > 0:
-            return Score(True, intersection)
+        for mutation_set in env:
+            intersection = mutation_set.mutations & self.mutations.mutations
+            if len(intersection) > 0:
+                return Score(True, intersection)
         return None
 
 

@@ -1,14 +1,6 @@
 import unittest
-from functools import reduce
 from pyvdrm.asi2 import ASI2, AsiMutations, Score
-from pyvdrm.vcf import Mutation, MutationSet
-
-
-def mus(mutations):
-    if mutations == '':
-        return set([])
-    return reduce(lambda x, y: x.union(y),
-                  map(lambda x: set(MutationSet(x)), mutations.split()))
+from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 
 
 # noinspection SqlNoDataSourceInspection,SqlDialectInspection
@@ -19,9 +11,9 @@ class TestRuleParser(unittest.TestCase):
 
     def test_stanford_ex2(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
-        m1 = Mutation('41L')
-        m2 = Mutation('67N')
-        m3 = Mutation('70N')
+        m1 = MutationSet('41L')
+        m2 = MutationSet('67N')
+        m3 = MutationSet('70N')
         self.assertTrue(rule([m1, m2]))
         self.assertFalse(rule([m1, m3]))
 
@@ -58,41 +50,41 @@ class TestRuleSemantics(unittest.TestCase):
     
     def test_score_from(self):
         rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
-        self.assertEqual(rule(mus("100G 102G")), 10)
+        self.assertEqual(rule(VariantCalls("100G 102G")), 10)
 
     def test_score_from_max(self):
         rule = ASI2("SCORE FROM (MAX (100G => 10, 101D => 20, 102D => 30))")
-        self.assertEqual(rule(mus("100G 101D")), 20)
-        self.assertEqual(rule(mus("10G 11D")), False)
+        self.assertEqual(rule(VariantCalls("100G 101D")), 20)
+        self.assertEqual(rule(VariantCalls("10G 11D")), False)
 
     def test_score_from_max_neg(self):
         rule = ASI2("SCORE FROM (MAX (100G => -10, 101D => -20, 102D => 30))")
-        self.assertEqual(rule(mus("100G 101D")), -10)
-        self.assertEqual(rule(mus("10G 11D")), False) 
+        self.assertEqual(rule(VariantCalls("100G 101D")), -10)
+        self.assertEqual(rule(VariantCalls("10G 11D")), False)
 
     def test_bool_and(self):
         rule = ASI2("1G AND (2T AND 7Y)")
-        self.assertEqual(rule(mus("2T 7Y 1G")), True)
-        self.assertEqual(rule(mus("2T 1Y 1G")), False)
-        self.assertEqual(rule(mus("7Y 1G 2T")), True)
+        self.assertEqual(rule(VariantCalls("2T 7Y 1G")), True)
+        self.assertEqual(rule(VariantCalls("2T 3Y 1G")), False)
+        self.assertEqual(rule(VariantCalls("7Y 1G 2T")), True)
         self.assertEqual(rule([]), False)
 
     def test_bool_or(self):
         rule = ASI2("1G OR (2T OR 7Y)")
-        self.assertTrue(rule(mus("2T")))
-        self.assertFalse(rule(mus("3T")))
-        self.assertTrue(rule(mus("1G")))
+        self.assertTrue(rule(VariantCalls("2T")))
+        self.assertFalse(rule(VariantCalls("3T")))
+        self.assertTrue(rule(VariantCalls("1G")))
         self.assertFalse(rule([]))
 
     def test_select_from_atleast(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (2T, 7Y, 3G)")
-        self.assertTrue(rule(mus("2T 7Y 1G")))
-        self.assertFalse(rule(mus("2T 0Y 0G")))
-        self.assertTrue(rule(mus("3G 9Y 2T")))
+        self.assertTrue(rule(VariantCalls("2T 7Y 1G")))
+        self.assertFalse(rule(VariantCalls("2T 4Y 5G")))
+        self.assertTrue(rule(VariantCalls("3G 9Y 2T")))
 
     def test_score_from_exactly(self):
         rule = ASI2("SELECT EXACTLY 1 FROM (2T, 7Y)")
-        score = rule(mus("2T 7Y 1G"))
+        score = rule(VariantCalls("2T 7Y 1G"))
         self.assertEqual(0, score)
 
 
@@ -122,10 +114,10 @@ class TestActualRules(unittest.TestCase):
         215FY) => 10), MAX ((41L AND 215ACDEILNSV) => 5, (41L AND 215FY) =>
         15))
         """)
-        self.assertEqual(rule(mus("40F 41L 210W 215Y")), 65)
-        self.assertEqual(rule(mus("41L 210W 215F")), 60)
-        self.assertEqual(rule(mus("40F 210W 215Y")), 25)
-        self.assertEqual(rule(mus("40F 67G 215Y")), 15) 
+        self.assertEqual(rule(VariantCalls("40F 41L 210W 215Y")), 65)
+        self.assertEqual(rule(VariantCalls("41L 210W 215F")), 60)
+        self.assertEqual(rule(VariantCalls("40F 210W 215Y")), 25)
+        self.assertEqual(rule(VariantCalls("40F 67G 215Y")), 15)
 
 
 class TestAsiMutations(unittest.TestCase):
