@@ -220,7 +220,7 @@ class AsiMutations(object):
 
     def __call__(self, env):
         for mutation_set in env:
-            intersection = mutation_set.mutations & self.mutations.mutations
+            intersection = self.mutations.mutations & mutation_set.mutations
             if len(intersection) > 0:
                 return Score(True, intersection)
         return None

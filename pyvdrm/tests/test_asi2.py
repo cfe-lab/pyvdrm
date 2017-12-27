@@ -47,10 +47,17 @@ class TestRuleParser(unittest.TestCase):
 
 # noinspection SqlNoDataSourceInspection,SqlDialectInspection
 class TestRuleSemantics(unittest.TestCase):
-    
     def test_score_from(self):
         rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
         self.assertEqual(rule(VariantCalls("100G 102G")), 10)
+
+    def test_score_residues(self):
+        rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
+        expected_residue = repr({Mutation('S100G')})
+
+        result = rule.dtree(VariantCalls("S100G R102G"))
+
+        self.assertEqual(expected_residue, repr(result.residues))
 
     def test_score_from_max(self):
         rule = ASI2("SCORE FROM (MAX (100G => 10, 101D => 20, 102D => 30))")
