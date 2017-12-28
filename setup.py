@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='pyvdrm',
-    version='0.0.1',
+    version='0.0.2',
     description='',
 
     url='',
