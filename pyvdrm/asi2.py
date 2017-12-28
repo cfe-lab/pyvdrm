@@ -77,10 +77,10 @@ class Score(object):
 class Negate(AsiExpr):
     """Unary negation of boolean child"""
     def __call__(self, mutations):
-        child = self.children[0](mutations)
-        if child is None:
+        child_score = self.children[0](mutations)
+        if child_score is None:
             return Score(True, []) # TODO: propagate negative residues
-        return Score(not child.score, child.residues)
+        return Score(not child_score.score, child_score.residues)
 
 
 class AndExpr(AsiExpr):
