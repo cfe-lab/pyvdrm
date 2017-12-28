@@ -51,6 +51,11 @@ class TestRuleSemantics(unittest.TestCase):
         rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
         self.assertEqual(rule(VariantCalls("100G 102G")), 10)
 
+    def test_score_from(self):
+        rule = ASI2("SCORE FROM ( NOT 100G => 10, NOT 101SD => 20 )")
+        self.assertEqual(rule(VariantCalls("100G 102G")), 20)
+        self.assertEqual(rule(VariantCalls("100S 101S")), 10)
+
     def test_score_residues(self):
         rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
         expected_residue = repr({Mutation('S100G')})
