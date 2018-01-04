@@ -81,6 +81,14 @@ class TestRuleSemantics(unittest.TestCase):
         self.assertEqual(rule(VariantCalls("7Y 1G 2T")), True)
         self.assertEqual(rule([]), False)
 
+    def test_bool_constants(self):
+        rule = ASI2("TRUE OR 1G")
+        self.assertEqual(rule(VariantCalls("2G")), True)
+        rule = ASI2("FALSE AND 1G")
+        self.assertEqual(rule(VariantCalls("1G")), False)
+        rule = ASI2("TRUE OR (FALSE AND TRUE)")
+        self.assertEqual(rule(VariantCalls("1G")), True)
+
     def test_bool_or(self):
         rule = ASI2("1G OR (2T OR 7Y)")
         self.assertTrue(rule(VariantCalls("2T")))
