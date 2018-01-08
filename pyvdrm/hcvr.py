@@ -4,9 +4,17 @@ HCV Drug Resistance Rule Parser definition
 
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
-                       infixNotation, delimitedList, opAssoc)
+                       infixNotation, delimitedList, opAssoc, alphas)
 from pyvdrm.drm import AsiExpr, AsiBinaryExpr, AsiUnaryExpr, DRMParser
 from pyvdrm.vcf import MutationSet
+
+def update_flags(fst, snd):
+    for k in snd:
+        if k in fst:
+            fst[k].append(snd[k])
+        else:
+            fst[k] = snd[k] # this chould be achieved with a defaultdict
+    return fst
 
 
 def maybe_foldl(func, noneable):
@@ -42,22 +50,28 @@ class Score(object):
 
     residues = set([])
     score = None
-    flags = [] # allow a score expression to raise a user defined string
+    flags = {} # allow a score expression to raise a user defined string
 
-    def __init__(self, score, residues):
+    def __init__(self, score, residues, flags={}):
         """ Initialize.
 
         :param bool|float score: value of the score
         :param residues: sequence of Mutations
+        :param flags: dictionary of user defined strings and supporting Mutations
         """
         self.score = score
         self.residues = set(residues)
+        self.flags = flags
 
     def __add__(self, other):
-        return Score(self.score + other.score, self.residues | other.residues)
+        flags = update_flags(self.flags, other.flags)
+        return Score(self.score + other.score, self.residues | other.residues,
+                flags)
 
     def __sub__(self, other):
-        return Score(self.score - other.score, self.residues | other.residues)
+        flags = update_flags(self.flags, other.flags)
+        return Score(self.score - other.score, self.residues | other.residues,
+                flags)
 
     def __repr__(self):
         return "Score({!r}, {!r})".format(self.score, self.residues)
@@ -155,14 +169,23 @@ class ScoreExpr(AsiExpr):
     """Score expressions propagate DRM scores"""
 
     def __call__(self, mutations):
-        if len(self.children) == 3:
+
+        flags = {}
+        if len(self.children) == 4:
+            operation, _, flag, _ = self.children
+            flags[flag] = []
+            score = 0 # should be None
+
+        elif len(self.children) == 3:
             operation, minus, score = self.children
-            if minus != '-':
+            if minus != '-': # this is parsing the expression twice, refactor
                 raise ValueError
             score = -1 * int(score)
+
         elif len(self.children) == 2:
             operation, score = self.children
             score = int(score)
+
         else:
             raise ValueError
 
@@ -173,7 +196,7 @@ class ScoreExpr(AsiExpr):
 
         if result.score is False:
             return Score(0, [])
-        return Score(score, result.residues)
+        return Score(score, result.residues, flags=flags)
 
 
 class ScoreList(AsiExpr):
@@ -262,6 +285,9 @@ class HCVR(DRMParser):
         notmorethan = Literal('NOTMORETHAN')
         l_par = Literal('(').suppress()
         r_par = Literal(')').suppress()
+
+        quote = Literal('"')
+
         mapper = Literal('=>').suppress()
         integer = Word(nums)
 
@@ -302,7 +328,8 @@ class HCVR(DRMParser):
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
                                            (or_, 2, opAssoc.LEFT, OrExpr)]) | condition
 
-        scoreitem = booleancondition + mapper + Optional(Literal('-')) + integer
+        score = Optional(Literal('-')) + integer | quote + Word(alphas) + quote
+        scoreitem = booleancondition + mapper + score
         scoreitem.setParseAction(ScoreExpr)
         scorelist = max_ + l_par + delimitedList(scoreitem) + r_par |\
             delimitedList(scoreitem)
