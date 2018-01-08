@@ -83,6 +83,18 @@ class Negate(AsiExpr):
         return Score(not child_score.score, child_score.residues)
 
 
+class BoolTrue(AsiExpr):
+    """Boolean True constant"""
+    def __call__(self, *args):
+        return Score(True, [])
+
+
+class BoolFalse(AsiExpr):
+    """Boolean False constant"""
+    def __call__(self, *args):
+        return Score(False, [])
+
+
 class AndExpr(AsiExpr):
     """Fold boolean AND on children"""
 
@@ -279,8 +291,11 @@ class ASI2(DRMParser):
         selectstatement = select + select_quantifier + from_ + residue_list
         selectstatement.setParseAction(SelectFrom)
 
+        bool_ = Literal('TRUE').suppress().setParseAction(BoolTrue) |\
+                Literal('FALSE').suppress().setParseAction(BoolFalse)
+
         booleancondition = Forward()
-        condition = residue | excludestatement | selectstatement
+        condition = residue | excludestatement | selectstatement | bool_
 
         booleancondition << infixNotation(condition,
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
