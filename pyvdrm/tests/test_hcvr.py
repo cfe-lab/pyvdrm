@@ -1,5 +1,5 @@
 import unittest
-from pyvdrm.asi2 import ASI2, AsiMutations, Score
+from pyvdrm.hcvr import HCVR, AsiMutations, Score
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 
 
@@ -7,10 +7,10 @@ from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 class TestRuleParser(unittest.TestCase):
 
     def test_stanford_ex1(self):
-        ASI2("151M OR 69i")
+        HCVR("151M OR 69i")
 
     def test_stanford_ex2(self):
-        rule = ASI2("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
+        rule = HCVR("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
         m1 = MutationSet('41L')
         m2 = MutationSet('67N')
         m3 = MutationSet('70N')
@@ -18,10 +18,10 @@ class TestRuleParser(unittest.TestCase):
         self.assertFalse(rule([m1, m3]))
 
     def test_stanford_ex3(self):
-        ASI2("SELECT ATLEAST 2 AND NOTMORETHAN 2 FROM (41L, 67N, 70R, 210W, 215FY, 219QE)")
+        HCVR("SELECT ATLEAST 2 AND NOTMORETHAN 2 FROM (41L, 67N, 70R, 210W, 215FY, 219QE)")
 
     def test_stanford_ex4(self):
-        ASI2("215FY AND NOT 184VI")
+        HCVR("215FY AND NOT 184VI")
 
     def test_stanford_rest(self):
         examples = ["SCORE FROM (65R => 20, 74V => 20, 184VI => 20)",
@@ -36,28 +36,28 @@ class TestRuleParser(unittest.TestCase):
                     "3N AND (2N AND (4N OR 2N))"]
 
         for ex in examples:
-            x = ASI2(ex)
+            x = HCVR(ex)
             self.assertEqual(ex, x.rule)
 
     def test_asi2_compat(self):
         q = "SCORE FROM ( 98G => 10, 100I => 40,\
                           MAX (101P => 40, 101E => 30, 101HN => 15, 101Q => 5) )"
-        ASI2(q)
+        HCVR(q)
 
 
 # noinspection SqlNoDataSourceInspection,SqlDialectInspection
 class TestRuleSemantics(unittest.TestCase):
     def test_score_from(self):
-        rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
+        rule = HCVR("SCORE FROM ( 100G => 10, 101D => 20 )")
         self.assertEqual(rule(VariantCalls("100G 102G")), 10)
 
     def test_score_negate(self):
-        rule = ASI2("SCORE FROM ( NOT 100G => 10, NOT 101SD => 20 )")
+        rule = HCVR("SCORE FROM ( NOT 100G => 10, NOT 101SD => 20 )")
         self.assertEqual(rule(VariantCalls("100G 102G")), 20)
         self.assertEqual(rule(VariantCalls("100S 101S")), 10)
 
     def test_score_residues(self):
-        rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
+        rule = HCVR("SCORE FROM ( 100G => 10, 101D => 20 )")
         expected_residue = repr({Mutation('S100G')})
 
         result = rule.dtree(VariantCalls("S100G R102G"))
@@ -65,37 +65,45 @@ class TestRuleSemantics(unittest.TestCase):
         self.assertEqual(expected_residue, repr(result.residues))
 
     def test_score_from_max(self):
-        rule = ASI2("SCORE FROM (MAX (100G => 10, 101D => 20, 102D => 30))")
+        rule = HCVR("SCORE FROM (MAX (100G => 10, 101D => 20, 102D => 30))")
         self.assertEqual(rule(VariantCalls("100G 101D")), 20)
         self.assertEqual(rule(VariantCalls("10G 11D")), False)
 
     def test_score_from_max_neg(self):
-        rule = ASI2("SCORE FROM (MAX (100G => -10, 101D => -20, 102D => 30))")
+        rule = HCVR("SCORE FROM (MAX (100G => -10, 101D => -20, 102D => 30))")
         self.assertEqual(rule(VariantCalls("100G 101D")), -10)
         self.assertEqual(rule(VariantCalls("10G 11D")), False)
 
     def test_bool_and(self):
-        rule = ASI2("1G AND (2T AND 7Y)")
+        rule = HCVR("1G AND (2T AND 7Y)")
         self.assertEqual(rule(VariantCalls("2T 7Y 1G")), True)
         self.assertEqual(rule(VariantCalls("2T 3Y 1G")), False)
         self.assertEqual(rule(VariantCalls("7Y 1G 2T")), True)
         self.assertEqual(rule([]), False)
 
+    def test_bool_constants(self):
+        rule = HCVR("TRUE OR 1G")
+        self.assertEqual(rule(VariantCalls("2G")), True)
+        rule = HCVR("FALSE AND 1G")
+        self.assertEqual(rule(VariantCalls("1G")), False)
+        rule = HCVR("TRUE OR (FALSE AND TRUE)")
+        self.assertEqual(rule(VariantCalls("1G")), True)
+
     def test_bool_or(self):
-        rule = ASI2("1G OR (2T OR 7Y)")
+        rule = HCVR("1G OR (2T OR 7Y)")
         self.assertTrue(rule(VariantCalls("2T")))
         self.assertFalse(rule(VariantCalls("3T")))
         self.assertTrue(rule(VariantCalls("1G")))
         self.assertFalse(rule([]))
 
     def test_select_from_atleast(self):
-        rule = ASI2("SELECT ATLEAST 2 FROM (2T, 7Y, 3G)")
+        rule = HCVR("SELECT ATLEAST 2 FROM (2T, 7Y, 3G)")
         self.assertTrue(rule(VariantCalls("2T 7Y 1G")))
         self.assertFalse(rule(VariantCalls("2T 4Y 5G")))
         self.assertTrue(rule(VariantCalls("3G 9Y 2T")))
 
     def test_score_from_exactly(self):
-        rule = ASI2("SELECT EXACTLY 1 FROM (2T, 7Y)")
+        rule = HCVR("SELECT EXACTLY 1 FROM (2T, 7Y)")
         score = rule(VariantCalls("2T 7Y 1G"))
         self.assertEqual(0, score)
 
@@ -103,11 +111,11 @@ class TestRuleSemantics(unittest.TestCase):
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):
         for line in open("pyvdrm/tests/HIVDB.rules"):
-            r = ASI2(line)
+            r = HCVR(line)
             self.assertEqual(line, r.rule)
 
     def test_chained_and(self):
-        rule = ASI2("""
+        rule = HCVR("""
         SCORE FROM(41L => 5, 62V => 5, MAX ( 65E => 10, 65N =>
         30, 65R => 45 ), MAX ( 67E => 5, 67G => 5, 67H => 5, 67N => 5, 67S =>
         5, 67T => 5, 67d => 30 ), 68d => 15, MAX ( 69G => 10, 69i => 60, 69d =>

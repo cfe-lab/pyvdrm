@@ -1,5 +1,5 @@
 """
-ASI2 Parser definition
+HCV Drug Resistance Rule Parser definition
 """
 
 from functools import reduce, total_ordering
@@ -42,6 +42,7 @@ class Score(object):
 
     residues = set([])
     score = None
+    flags = [] # allow a score expression to raise a user defined string
 
     def __init__(self, score, residues):
         """ Initialize.
@@ -132,7 +133,7 @@ class OrExpr(AsiBinaryExpr):
 
 
 class EqualityExpr(AsiExpr):
-    """ASI2 inequality expressions"""
+    """ASI2 style inequality expressions"""
 
     def __init__(self, label, pos, children):
         super().__init__(label, pos, children)
@@ -240,8 +241,8 @@ class AsiMutations(object):
         return None
 
 
-class ASI2(DRMParser):
-    """ASI2 Syntax definition"""
+class HCVR(DRMParser):
+    """HCV Resistance Syntax definition"""
 
     def parser(self, rule):
 
@@ -274,7 +275,7 @@ class ASI2(DRMParser):
         # integer + l_par + not_ + Regex(r'[A-Z]+') + r_par
         # roll this next rule into the mutation object
 
-        # Syntax of ASI expressions
+        # Syntax of expressions
         excludestatement = except_ + residue
 
         quantifier = exactly | atleast | notmorethan
