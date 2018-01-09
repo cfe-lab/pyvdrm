@@ -108,11 +108,11 @@ class TestRuleSemantics(unittest.TestCase):
         self.assertEqual(0, score)
 
     def test_score_comment(self):
-        rule = HCVR("SCORE FROM (100G => 10, 200T => 3, 100S => \"comment\")")
+        rule = HCVR("SCORE FROM (100G => 10, 200T => 3, 100S => \"flag1 with_space\")")
         self.assertEqual(rule(VariantCalls("100G")), 10)
         result = rule.dtree(VariantCalls("100S 200T"))
         self.assertEqual(result.score, 3)
-        self.assertTrue("comment" in result.flags)
+        self.assertTrue("flag1 with_space" in result.flags)
 
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):

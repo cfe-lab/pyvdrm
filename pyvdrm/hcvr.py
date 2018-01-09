@@ -328,7 +328,7 @@ class HCVR(DRMParser):
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
                                            (or_, 2, opAssoc.LEFT, OrExpr)]) | condition
 
-        score = Optional(Literal('-')) + integer | quote + Word(alphas) + quote
+        score = Optional(Literal('-')) + integer | quote + Regex(r'[a-zA-Z0-9 _]+') + quote
         scoreitem = booleancondition + mapper + score
         scoreitem.setParseAction(ScoreExpr)
         scorelist = max_ + l_par + delimitedList(scoreitem) + r_par |\
