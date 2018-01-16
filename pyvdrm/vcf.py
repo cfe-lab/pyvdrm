@@ -5,6 +5,8 @@ import re
 from collections import namedtuple
 from operator import attrgetter
 
+AMINO_ALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
+
 
 class VariantCalls(namedtuple('VariantCalls', 'mutation_sets reference')):
     # TODO: remove all these __init__ methods once PyCharm bug is fixed.
@@ -152,18 +154,24 @@ class MutationSet(namedtuple('MutationSet', 'pos mutations wildtype')):
                 variants=None,
                 mutations=None,
                 reference=None):
+        negative = None
         if text:
-            match = re.match(r"([A-Z]?)(\d+)([idA-Z]*)$", text)
+            match = re.match(r"([A-Z]?)(\d+)(!)?([idA-Z]+)$", text)
             if match is None:
                 message = 'MutationSet text expects wild type (optional), ' \
-                          'position, and zero or more variants.'
+                          'position, and one or more variants.'
                 raise ValueError(message)
 
-            wildtype, pos, variants = match.groups()
+            wildtype, pos, negative, variants = match.groups()
             if reference:
                 wildtype = reference[int(pos)-1]
 
         if variants:
+            if negative:
+                original_variants = variants
+                variants = (c
+                            for c in AMINO_ALPHABET
+                            if c not in original_variants)
             mutations = frozenset(Mutation(wildtype=wildtype,
                                            pos=pos,
                                            variant=variant)
@@ -251,7 +259,14 @@ class MutationSet(namedtuple('MutationSet', 'pos mutations wildtype')):
     def __str__(self):
         text = self.wildtype or ''
         text += str(self.pos)
-        text += ''.join(sorted(mutation.variant for mutation in self.mutations))
+        mutations = ''.join(sorted(mutation.variant
+                                   for mutation in self.mutations))
+        if len(mutations) > 10:
+            text += '!'
+            mutations = ''.join(c
+                                for c in AMINO_ALPHABET
+                                if c not in mutations)
+        text += mutations
         return text
 
     def __repr__(self):

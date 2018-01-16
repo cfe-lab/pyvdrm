@@ -96,6 +96,17 @@ class TestMutationSet(unittest.TestCase):
         self.assertEqual(expected_position, ms.pos)
         self.assertEqual(expected_mutations, ms.mutations)
 
+    def test_init_negative_text(self):
+        expected_wildtype = 'Q'
+        expected_position = 1
+        expected_mutations = MutationSet('Q1DEFGHIKLMNPQRSTVWY').mutations
+
+        ms = MutationSet('Q1!AC')
+
+        self.assertEqual(expected_wildtype, ms.wildtype)
+        self.assertEqual(expected_position, ms.pos)
+        self.assertEqual(expected_mutations, ms.mutations)
+
     def test_init_variants(self):
         expected_wildtype = 'Q'
         expected_position = 1
@@ -206,8 +217,8 @@ class TestMutationSet(unittest.TestCase):
     def test_init_bad_text(self):
         expected_message = \
             r'MutationSet text expects wild type \(optional\), position, and ' \
-            r'zero or more variants\.'
-        for bad_text in ('!20A', '20Ac', 'r20Q'):
+            r'one or more variants\.'
+        for bad_text in ('!20A', '20Ac', 'r20Q', 'R20', 'R20!'):
             with self.subTest(bad_text):
                 with self.assertRaisesRegex(ValueError, expected_message):
                     MutationSet(bad_text)
@@ -215,6 +226,22 @@ class TestMutationSet(unittest.TestCase):
     def test_repr(self):
         expected_repr = "MutationSet('Q1AC')"
         ms = MutationSet('Q1AC')
+
+        r = repr(ms)
+
+        self.assertEqual(expected_repr, r)
+
+    def test_repr_negative(self):
+        expected_repr = "MutationSet('Q1!AC')"
+        ms = MutationSet('Q1!AC')
+
+        r = repr(ms)
+
+        self.assertEqual(expected_repr, r)
+
+    def test_repr_converted_to_negative(self):
+        expected_repr = "MutationSet('Q1!AC')"
+        ms = MutationSet('Q1DEFGHIKLMNPQRSTVWY')
 
         r = repr(ms)
 
@@ -273,7 +300,6 @@ class TestMutationSet(unittest.TestCase):
             ms.wildtype = 'D'
 
     def test_length(self):
-        self.assertEqual(0, len(MutationSet('A10')))
         self.assertEqual(1, len(MutationSet('A10I')))
         self.assertEqual(2, len(MutationSet('A10IL')))
 
