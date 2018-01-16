@@ -48,11 +48,7 @@ def maybe_map(func, noneable):
 class Score(object):
     """Encapsulate a score and the residues that support it"""
 
-    residues = set([])
-    score = None
-    flags = {} # allow a score expression to raise a user defined string
-
-    def __init__(self, score, residues, flags={}):
+    def __init__(self, score, residues, flags=None):
         """ Initialize.
 
         :param bool|float score: value of the score
@@ -61,7 +57,11 @@ class Score(object):
         """
         self.score = score
         self.residues = set(residues)
-        self.flags = flags
+
+        if flags is None:
+            self.flags = {}
+        else:
+            self.flags = flags
 
     def __add__(self, other):
         flags = update_flags(self.flags, other.flags)
@@ -89,15 +89,6 @@ class Score(object):
         return self.score
 
 
-class Negate(AsiExpr):
-    """Unary negation of boolean child"""
-    def __call__(self, mutations):
-        child_score = self.children[0](mutations)
-        if child_score is None:
-            return Score(True, []) # TODO: propagate negative residues
-        return Score(not child_score.score, child_score.residues)
-
-
 class BoolTrue(AsiExpr):
     """Boolean True constant"""
     def __call__(self, *args):
@@ -119,11 +110,12 @@ class AndExpr(AsiExpr):
         if not scores:
             raise ValueError
 
-        residues = set([])
+        residues = set()
+
         for s in scores:
+            residues |= s.residues
             if not s.score:
                 return Score(False, [])
-            residues = residues | s.residues
 
         return Score(True, residues)
 
@@ -261,6 +253,8 @@ class AsiMutations(object):
             intersection = self.mutations.mutations & mutation_set.mutations
             if len(intersection) > 0:
                 return Score(True, intersection)
+
+        # the mutationset has no members in the environment
         return None
 
 
@@ -291,15 +285,8 @@ class HCVR(DRMParser):
         mapper = Literal('=>').suppress()
         integer = Word(nums)
 
-        mutation = Optional(Regex(r'[A-Z]')) + integer + Regex(r'[diA-Z]+')
-        mutation.setParseAction(AsiMutations)
-
-        not_ = Literal('NOT').suppress() + mutation
-        not_.setParseAction(Negate)
-
-        residue = mutation | not_
-        # integer + l_par + not_ + Regex(r'[A-Z]+') + r_par
-        # roll this next rule into the mutation object
+        residue = Optional(Regex(r'[A-Z]')) + integer + Regex(r'\!?[diA-Z]+')
+        residue.setParseAction(AsiMutations)
 
         # Syntax of expressions
         excludestatement = except_ + residue

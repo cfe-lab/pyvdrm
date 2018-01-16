@@ -1,3 +1,4 @@
+import sys
 import unittest
 from pyvdrm.hcvr import HCVR, AsiMutations, Score
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
@@ -21,12 +22,11 @@ class TestRuleParser(unittest.TestCase):
         HCVR("SELECT ATLEAST 2 AND NOTMORETHAN 2 FROM (41L, 67N, 70R, 210W, 215FY, 219QE)")
 
     def test_stanford_ex4(self):
-        HCVR("215FY AND NOT 184VI")
+        HCVR("215FY AND 184!VI")
 
     def test_stanford_rest(self):
         examples = ["SCORE FROM (65R => 20, 74V => 20, 184VI => 20)",
                     "151M AND EXCLUDE 69i",
-                    # "69(NOT TDN)",
                     "215F OR 215Y",
                     "SCORE FROM (101P => 40, 101E => 30, 101HN => 15, 101Q => 5 )",
                     "SCORE FROM ( MAX  (101P => 40, 101E => 30, 101HN => 15, 101Q => 5 ))",
@@ -48,13 +48,19 @@ class TestRuleParser(unittest.TestCase):
 # noinspection SqlNoDataSourceInspection,SqlDialectInspection
 class TestRuleSemantics(unittest.TestCase):
     def test_score_from(self):
-        rule = HCVR("SCORE FROM ( 100G => 10, 101D => 20 )")
-        self.assertEqual(rule(VariantCalls("100G 102G")), 10)
+        rule = HCVR("SCORE FROM ( 100G => 5, 101DST => 20 )")
+        self.assertEqual(rule(VariantCalls("100G 101G")), 5)
+        self.assertEqual(rule(VariantCalls("100G 102G")), 5)
+        self.assertEqual(rule(VariantCalls("100G 101D")), 25)
+        self.assertEqual(rule(VariantCalls("100G 101DST")), 25)
+        self.assertEqual(rule(VariantCalls("105G 106DST")), 0)
 
     def test_score_negate(self):
-        rule = HCVR("SCORE FROM ( NOT 100G => 10, NOT 101SD => 20 )")
-        self.assertEqual(rule(VariantCalls("100G 102G")), 20)
+        rule = HCVR("SCORE FROM ( 100!G => 10, 101!SD => 20 )")
+        self.assertEqual(rule(VariantCalls("100G 102G")), 0)
         self.assertEqual(rule(VariantCalls("100S 101S")), 10)
+        self.assertEqual(rule(VariantCalls("100S 101W")), 30)
+        self.assertEqual(rule(VariantCalls("101TW")), 20)
 
     def test_score_residues(self):
         rule = HCVR("SCORE FROM ( 100G => 10, 101D => 20 )")
@@ -184,7 +190,7 @@ class TestScore(unittest.TestCase):
         score = Score(expected_value, expected_mutations)
 
         self.assertEqual(expected_value, score.score)
-        self.assertEqual(expected_mutations, score.residues)
+        self.assertEqual(expected_mutations, set(score.residues))
 
     def test_repr(self):
         expected_repr = "Score(10, {Mutation('A23R')})"
@@ -194,6 +200,15 @@ class TestScore(unittest.TestCase):
 
         self.assertEqual(expected_repr, r)
 
+
+class TestVariantPropagation(unittest.TestCase):
+    def test_true_positive(self):
+        m = VariantCalls('Q54H 444H')
+        rule = HCVR("SCORE FROM ( 54H => 0, 444H => 8 )")
+        dtree = rule.dtree(m)
+
+        expected_repr = "[Mutation('Q54H'), Mutation('444H')]"
+        self.assertEqual(expected_repr, repr(sorted(dtree.residues)))
 
 if __name__ == '__main__':
     unittest.main()
