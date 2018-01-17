@@ -91,11 +91,14 @@ The `vcf` module has basic helper functions for construction lists of mutation
 calls:
 
 ```
-from pyvdrm.vcf import call_mutations
+from pyvdrm.vcf import VariantCalls
 from pyvdrm.asi2 import ASI2
 
-ref = "APITAYAQQTRGLLGCIITSLTGRD"
-sample = "APITAYAQQTRGLLTCIITSLTGRD"
+calls = VariantCalls(reference="APITAYAQQTRGLLGCIITSLTGRD",
+                     sample=   "APITAYAQQTRGLLTCIITSLTGRD")
+# mutation G15T ------------------------------^
 
-score = rule(call_mutations(ref, sample))
+rule = ASI2('SCORE FROM ( G15T => 5 )')
+score = rule(calls)
+print(score)  # => 5
 ```

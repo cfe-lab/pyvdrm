@@ -1,4 +1,7 @@
 import unittest
+
+from pyparsing import ParseException
+
 from pyvdrm.asi2 import ASI2, AsiMutations, Score
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 
@@ -98,6 +101,29 @@ class TestRuleSemantics(unittest.TestCase):
         rule = ASI2("SELECT EXACTLY 1 FROM (2T, 7Y)")
         score = rule(VariantCalls("2T 7Y 1G"))
         self.assertEqual(0, score)
+
+    def test_parse_exception(self):
+        expected_error_message = (
+            "Error in ASI2: SCORE FROM ( 10R => 2>!<;0 ) (at char 21), (line:1, col:22)")
+
+        with self.assertRaises(ParseException) as context:
+            ASI2("SCORE FROM ( 10R => 2;0 )")
+
+        self.assertEqual(expected_error_message, str(context.exception))
+
+    def test_parse_exception_multiline(self):
+        rule = """\
+SCORE FROM (
+    10R => 2;0
+)
+"""
+        expected_error_message = (
+            "Error in ASI2: 10R => 2>!<;0 (at char 25), (line:2, col:13)")
+
+        with self.assertRaises(ParseException) as context:
+            ASI2(rule)
+
+        self.assertEqual(expected_error_message, str(context.exception))
 
 
 class TestActualRules(unittest.TestCase):

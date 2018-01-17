@@ -4,7 +4,7 @@ ASI2 Parser definition
 
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
-                       infixNotation, delimitedList, opAssoc)
+                       infixNotation, delimitedList, opAssoc, ParseException)
 from pyvdrm.drm import AsiExpr, AsiBinaryExpr, AsiUnaryExpr, DRMParser
 from pyvdrm.vcf import MutationSet
 
@@ -299,4 +299,8 @@ class ASI2(DRMParser):
 
         statement = booleancondition | scorecondition
 
-        return statement.parseString(rule)
+        try:
+            return statement.parseString(rule)
+        except ParseException as ex:
+            ex.msg = 'Error in ASI2: ' + ex.markInputline()
+            raise

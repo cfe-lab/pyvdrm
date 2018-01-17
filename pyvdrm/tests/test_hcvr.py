@@ -1,5 +1,7 @@
-import sys
 import unittest
+
+from pyparsing import ParseException
+
 from pyvdrm.hcvr import HCVR, AsiMutations, Score
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 
@@ -120,6 +122,30 @@ class TestRuleSemantics(unittest.TestCase):
         self.assertEqual(result.score, 3)
         self.assertTrue("flag1 with_space" in result.flags)
 
+    def test_parse_exception(self):
+        expected_error_message = (
+            "Error in HCVR: SCORE FROM ( 10R => 2>!<;0 ) (at char 21), (line:1, col:22)")
+
+        with self.assertRaises(ParseException) as context:
+            HCVR("SCORE FROM ( 10R => 2;0 )")
+
+        self.assertEqual(expected_error_message, str(context.exception))
+
+    def test_parse_exception_multiline(self):
+        rule = """\
+SCORE FROM (
+    10R => 2;0
+)
+"""
+        expected_error_message = (
+            "Error in HCVR: 10R => 2>!<;0 (at char 25), (line:2, col:13)")
+
+        with self.assertRaises(ParseException) as context:
+            HCVR(rule)
+
+        self.assertEqual(expected_error_message, str(context.exception))
+
+
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):
         for line in open("pyvdrm/tests/HIVDB.rules"):
@@ -209,6 +235,7 @@ class TestVariantPropagation(unittest.TestCase):
 
         expected_repr = "[Mutation('Q54H'), Mutation('444H')]"
         self.assertEqual(expected_repr, repr(sorted(dtree.residues)))
+
 
 if __name__ == '__main__':
     unittest.main()
