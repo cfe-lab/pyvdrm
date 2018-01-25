@@ -232,8 +232,6 @@ class AsiMutations(object):
         self.mutations = MutationSet(''.join(args))
 
     def __repr__(self):
-        if self.mutations is None:
-            return "AsiMutations()"
         return "AsiMutations(args={!r})".format(str(self.mutations))
 
     def __call__(self, env):

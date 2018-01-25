@@ -7,6 +7,8 @@ from pyvdrm.drm import MissingPositionError
 from pyvdrm.hcvr import HCVR, AsiMutations, Score
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 
+from pyvdrm.tests.test_vcf import add_mutations
+
 
 # noinspection SqlNoDataSourceInspection,SqlDialectInspection
 class TestRuleParser(unittest.TestCase):
@@ -14,7 +16,7 @@ class TestRuleParser(unittest.TestCase):
     def test_stanford_ex1(self):
         HCVR("151M OR 69i")
 
-    def test(self):
+    def test_atleast_true(self):
         rule = HCVR("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
         self.assertTrue(rule(VariantCalls('41L 67N 70d 210d 215d 219d')))
 
@@ -156,21 +158,6 @@ SCORE FROM (
             HCVR(rule)
 
         self.assertEqual(expected_error_message, str(context.exception))
-
-
-def add_mutations(text):
-    """ Add a small set of mutations to an RT wild type. """
-
-    # Start of RT reference.
-    ref = ("PISPIETVPVKLKPGMDGPKVKQWPLTEEKIKALVEICTEMEKEGKISKIGPENPYNTPVFA"
-           "IKKKDSTKWRKLVDFRELNKRTQDFWEVQLGIPHPAGLKKKKSVTVLDVGDAYFSVPLDEDF"
-           "RKYTAFTIPSINNETPGIRYQYNVLPQGWKGSPAIFQSSMTKILEPFRKQNPDIVIYQYMDD"
-           "LYVGSDLEIGQHRTKIEELRQHLLRWGLTTPDKKHQK")
-    seq = list(ref)
-    changes = VariantCalls(text)
-    for mutation_set in changes:
-        seq[mutation_set.pos - 1] = [m.variant for m in mutation_set]
-    return VariantCalls(reference=ref, sample=seq)
 
 
 class TestActualRules(unittest.TestCase):

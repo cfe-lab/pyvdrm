@@ -4,7 +4,10 @@ import unittest
 from pyparsing import ParseException
 
 from pyvdrm.asi2 import ASI2, AsiMutations, Score
+from pyvdrm.drm import MissingPositionError
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
+
+from pyvdrm.tests.test_vcf import add_mutations
 
 
 # noinspection SqlNoDataSourceInspection,SqlDialectInspection
@@ -13,13 +16,19 @@ class TestRuleParser(unittest.TestCase):
     def test_stanford_ex1(self):
         ASI2("151M OR 69i")
 
-    def test_stanford_ex2(self):
+    def test_atleast_true(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
-        m1 = MutationSet('41L')
-        m2 = MutationSet('67N')
-        m3 = MutationSet('70N')
-        self.assertTrue(rule([m1, m2]))
-        self.assertFalse(rule([m1, m3]))
+        self.assertTrue(rule(VariantCalls('41L 67N 70d 210d 215d 219d')))
+
+    def test_atleast_false(self):
+        rule = ASI2("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
+        self.assertFalse(rule(VariantCalls('41L 67d 70d 210d 215d 219d')))
+
+    def test_atleast_missing(self):
+        rule = ASI2("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
+        with self.assertRaisesRegex(MissingPositionError,
+                                    r'Missing position 70.'):
+            rule(VariantCalls('41L 67N'))
 
     def test_stanford_ex3(self):
         ASI2("SELECT ATLEAST 2 AND NOTMORETHAN 2 FROM (41L, 67N, 70R, 210W, 215FY, 219QE)")
@@ -53,50 +62,47 @@ class TestRuleParser(unittest.TestCase):
 class TestRuleSemantics(unittest.TestCase):
     def test_score_from(self):
         rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
-        self.assertEqual(rule(VariantCalls("100G 102G")), 10)
+        self.assertEqual(rule(VariantCalls("100G 101d")), 10)
 
     def test_score_negate(self):
         rule = ASI2("SCORE FROM ( NOT 100G => 10, NOT 101SD => 20 )")
-        self.assertEqual(rule(VariantCalls("100G 102G")), 20)
+        self.assertEqual(rule(VariantCalls("100G 101d")), 20)
         self.assertEqual(rule(VariantCalls("100S 101S")), 10)
 
     def test_score_residues(self):
         rule = ASI2("SCORE FROM ( 100G => 10, 101D => 20 )")
         expected_residue = repr({Mutation('S100G')})
 
-        result = rule.dtree(VariantCalls("S100G R102G"))
+        result = rule.dtree(VariantCalls("S100G R101d"))
 
         self.assertEqual(expected_residue, repr(result.residues))
 
     def test_score_from_max(self):
         rule = ASI2("SCORE FROM (MAX (100G => 10, 101D => 20, 102D => 30))")
-        self.assertEqual(rule(VariantCalls("100G 101D")), 20)
-        self.assertEqual(rule(VariantCalls("10G 11D")), False)
+        self.assertEqual(rule(VariantCalls("100G 101D 102d")), 20)
+        self.assertEqual(rule(VariantCalls("100d 101d 102d")), False)
 
     def test_score_from_max_neg(self):
         rule = ASI2("SCORE FROM (MAX (100G => -10, 101D => -20, 102D => 30))")
-        self.assertEqual(rule(VariantCalls("100G 101D")), -10)
-        self.assertEqual(rule(VariantCalls("10G 11D")), False)
+        self.assertEqual(rule(VariantCalls("100G 101D 102d")), -10)
 
     def test_bool_and(self):
         rule = ASI2("1G AND (2T AND 7Y)")
         self.assertEqual(rule(VariantCalls("2T 7Y 1G")), True)
-        self.assertEqual(rule(VariantCalls("2T 3Y 1G")), False)
+        self.assertEqual(rule(VariantCalls("2T 7d 1G")), False)
         self.assertEqual(rule(VariantCalls("7Y 1G 2T")), True)
-        self.assertEqual(rule([]), False)
 
     def test_bool_or(self):
         rule = ASI2("1G OR (2T OR 7Y)")
-        self.assertTrue(rule(VariantCalls("2T")))
-        self.assertFalse(rule(VariantCalls("3T")))
-        self.assertTrue(rule(VariantCalls("1G")))
-        self.assertFalse(rule([]))
+        self.assertTrue(rule(VariantCalls("1d 2T 7d")))
+        self.assertFalse(rule(VariantCalls("1d 2d 7d")))
+        self.assertTrue(rule(VariantCalls("1G 2d 7d")))
 
     def test_select_from_atleast(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (2T, 7Y, 3G)")
-        self.assertTrue(rule(VariantCalls("2T 7Y 1G")))
-        self.assertFalse(rule(VariantCalls("2T 4Y 5G")))
-        self.assertTrue(rule(VariantCalls("3G 9Y 2T")))
+        self.assertTrue(rule(VariantCalls("2T 7Y 3d")))
+        self.assertFalse(rule(VariantCalls("2T 7d 3d")))
+        self.assertTrue(rule(VariantCalls("3G 7d 2T")))
 
     def test_score_from_exactly(self):
         rule = ASI2("SELECT EXACTLY 1 FROM (2T, 7Y)")
@@ -155,10 +161,10 @@ class TestActualRules(unittest.TestCase):
         215FY) => 10), MAX ((41L AND 215ACDEILNSV) => 5, (41L AND 215FY) =>
         15))
         """)
-        self.assertEqual(rule(VariantCalls("40F 41L 210W 215Y")), 65)
-        self.assertEqual(rule(VariantCalls("41L 210W 215F")), 60)
-        self.assertEqual(rule(VariantCalls("40F 210W 215Y")), 25)
-        self.assertEqual(rule(VariantCalls("40F 67G 215Y")), 15)
+        self.assertEqual(rule(add_mutations("40F 41L 210W 215Y")), 65)
+        self.assertEqual(rule(add_mutations("41L 210W 215F")), 60)
+        self.assertEqual(rule(add_mutations("40F 210W 215Y")), 25)
+        self.assertEqual(rule(add_mutations("40F 67G 215Y")), 15)
 
 
 class TestAsiMutations(unittest.TestCase):
@@ -169,22 +175,9 @@ class TestAsiMutations(unittest.TestCase):
         self.assertEqual(expected_mutation_set, m.mutations)
         self.assertEqual(expected_mutation_set.wildtype, m.mutations.wildtype)
 
-    def test_init_none(self):
-        m = AsiMutations()
-
-        self.assertIsNone(m.mutations)
-
     def test_repr(self):
         expected_repr = "AsiMutations(args='Q80KR')"
         m = AsiMutations(args='Q80KR')
-
-        r = repr(m)
-
-        self.assertEqual(expected_repr, r)
-
-    def test_repr_none(self):
-        expected_repr = "AsiMutations()"
-        m = AsiMutations()
 
         r = repr(m)
 

@@ -5,35 +5,8 @@ ASI2 Parser definition
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
                        infixNotation, delimitedList, opAssoc, ParseException)
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser
+from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser, MissingPositionError
 from pyvdrm.vcf import MutationSet
-
-
-def maybe_foldl(func, noneable):
-    """Safely fold a function over a potentially empty list of
-    potentially null values"""
-    if noneable is None:
-        return None
-    clean = [x for x in noneable if x is not None]
-    if not clean:
-        return None
-    return reduce(func, clean)
-
-
-def maybe_map(func, noneable):
-    if noneable is None:
-        return None
-    r_list = []
-    for x in noneable:
-        if x is None:
-            continue
-        result = func(x)
-        if result is None:
-            continue
-        r_list.append(result)
-    if not r_list:
-        return None
-    return r_list
 
 
 @total_ordering
@@ -169,10 +142,17 @@ class ScoreList(AsiExpr):
     def __call__(self, mutations):
         operation, *rest = self.children
         if operation == 'MAX':
-            return maybe_foldl(max, [f(mutations) for f in rest])
-
-        # the default operation is sum
-        return maybe_foldl(lambda x, y: x+y, [f(mutations) for f in self.children])
+            terms = rest
+            func = max
+        else:
+            # the default operation is sum
+            terms = self.children
+            func = sum
+        scores = [f(mutations) for f in terms]
+        matched_scores = [score.score for score in scores if score.score]
+        residues = reduce(lambda x, y: x | y,
+                          (score.residues for score in scores))
+        return Score(bool(matched_scores) and func(matched_scores), residues)
 
 
 class SelectFrom(AsiExpr):
@@ -186,15 +166,13 @@ class SelectFrom(AsiExpr):
     def __call__(self, mutations):
         operation, *rest = self.children
         # the head of the arg list must be an equality expression
-       
-        scored = list(maybe_map(lambda f: f(mutations), rest))
-        passing = len(scored) 
 
-        if operation(passing):
-            return Score(True, maybe_foldl(
-                lambda x, y: x.residues.union(y.residues), scored))
-        else:
-            return None
+        scored = [f(mutations) for f in rest]
+        passing = sum(bool(score.score) for score in scored)
+
+        return Score(operation(passing),
+                     reduce(lambda x, y: x | y,
+                            (item.residues for item in scored)))
 
 
 class AsiScoreCond(AsiExpr):
@@ -204,7 +182,7 @@ class AsiScoreCond(AsiExpr):
 
     def __call__(self, args):
         """Score conditions evaluate a list of expressions and sum scores"""
-        return maybe_foldl(lambda x, y: x+y, map(lambda x: x(args), self.children))
+        return sum((f(args) for f in self.children), Score(False, set()))
 
 
 class AsiMutations(object):
@@ -213,19 +191,24 @@ class AsiMutations(object):
     def __init__(self, _label=None, _pos=None, args=None):
         """Initialize set of mutations from a potentially ambiguous residue
         """
-        self.mutations = args and MutationSet(''.join(args))
+        self.mutations = MutationSet(''.join(args))
 
     def __repr__(self):
-        if self.mutations is None:
-            return "AsiMutations()"
         return "AsiMutations(args={!r})".format(str(self.mutations))
 
     def __call__(self, env):
+        is_found = False
         for mutation_set in env:
+            is_found |= mutation_set.pos == self.mutations.pos
             intersection = self.mutations.mutations & mutation_set.mutations
             if len(intersection) > 0:
                 return Score(True, intersection)
-        return None
+
+        if not is_found:
+            # Some required positions were not found in the environment.
+            raise MissingPositionError('Missing position {}.'.format(
+                self.mutations.pos))
+        return Score(False, set())
 
 
 class ASI2(DRMParser):
