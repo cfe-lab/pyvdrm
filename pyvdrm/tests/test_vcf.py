@@ -1,6 +1,5 @@
 import unittest
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
-from vcf import VariantCalls
 
 
 class TestMutation(unittest.TestCase):
@@ -428,10 +427,6 @@ class TestVariantCalls(unittest.TestCase):
             calls.reference = 'ASH'
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
 def add_mutations(text):
     """ Add a small set of mutations to an RT wild type. """
 
@@ -445,3 +440,7 @@ def add_mutations(text):
     for mutation_set in changes:
         seq[mutation_set.pos - 1] = [m.variant for m in mutation_set]
     return VariantCalls(reference=ref, sample=seq)
+
+
+if __name__ == '__main__':
+    unittest.main()
