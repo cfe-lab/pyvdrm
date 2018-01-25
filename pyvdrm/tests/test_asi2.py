@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from pyparsing import ParseException
@@ -128,7 +129,9 @@ SCORE FROM (
 
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):
-        for line in open("pyvdrm/tests/HIVDB.rules"):
+        folder = os.path.dirname(__file__)
+        rules_file = os.path.join(folder, 'HIVDB.rules')
+        for line in open(rules_file):
             r = ASI2(line)
             self.assertEqual(line, r.rule)
 

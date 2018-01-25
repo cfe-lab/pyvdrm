@@ -5,7 +5,7 @@ ASI2 Parser definition
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
                        infixNotation, delimitedList, opAssoc, ParseException)
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, AsiUnaryExpr, DRMParser
+from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser
 from pyvdrm.vcf import MutationSet
 
 
@@ -79,7 +79,7 @@ class Negate(AsiExpr):
     def __call__(self, mutations):
         child_score = self.children[0](mutations)
         if child_score is None:
-            return Score(True, []) # TODO: propagate negative residues
+            return Score(True, [])  # TODO: propagate negative residues
         return Score(not child_score.score, child_score.residues)
 
 

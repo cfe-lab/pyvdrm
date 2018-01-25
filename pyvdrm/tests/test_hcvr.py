@@ -1,7 +1,9 @@
+import os
 import unittest
 
 from pyparsing import ParseException
 
+from pyvdrm.drm import MissingPositionError
 from pyvdrm.hcvr import HCVR, AsiMutations, Score
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 
@@ -12,13 +14,19 @@ class TestRuleParser(unittest.TestCase):
     def test_stanford_ex1(self):
         HCVR("151M OR 69i")
 
-    def test_stanford_ex2(self):
+    def test(self):
         rule = HCVR("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
-        m1 = MutationSet('41L')
-        m2 = MutationSet('67N')
-        m3 = MutationSet('70N')
-        self.assertTrue(rule([m1, m2]))
-        self.assertFalse(rule([m1, m3]))
+        self.assertTrue(rule(VariantCalls('41L 67N 70d 210d 215d 219d')))
+
+    def test_atleast_false(self):
+        rule = HCVR("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
+        self.assertFalse(rule(VariantCalls('41L 67d 70d 210d 215d 219d')))
+
+    def test_atleast_missing(self):
+        rule = HCVR("SELECT ATLEAST 2 FROM (41L, 67N, 70R, 210W, 215F, 219Q)")
+        with self.assertRaisesRegex(MissingPositionError,
+                                    r'Missing position 70.'):
+            rule(VariantCalls('41L 67N'))
 
     def test_stanford_ex3(self):
         HCVR("SELECT ATLEAST 2 AND NOTMORETHAN 2 FROM (41L, 67N, 70R, 210W, 215FY, 219QE)")
@@ -52,46 +60,48 @@ class TestRuleSemantics(unittest.TestCase):
     def test_score_from(self):
         rule = HCVR("SCORE FROM ( 100G => 5, 101DST => 20 )")
         self.assertEqual(rule(VariantCalls("100G 101G")), 5)
-        self.assertEqual(rule(VariantCalls("100G 102G")), 5)
+        self.assertEqual(rule(VariantCalls("100G 101d")), 5)
         self.assertEqual(rule(VariantCalls("100G 101D")), 25)
         self.assertEqual(rule(VariantCalls("100G 101DST")), 25)
-        self.assertEqual(rule(VariantCalls("105G 106DST")), 0)
+        with self.assertRaisesRegex(MissingPositionError,
+                                    r'Missing position 100.'):
+            rule(VariantCalls("105G 106DST"))
 
     def test_score_negate(self):
         rule = HCVR("SCORE FROM ( 100!G => 10, 101!SD => 20 )")
-        self.assertEqual(rule(VariantCalls("100G 102G")), 0)
+        self.assertEqual(rule(VariantCalls("100G 101D")), 0)
         self.assertEqual(rule(VariantCalls("100S 101S")), 10)
         self.assertEqual(rule(VariantCalls("100S 101W")), 30)
-        self.assertEqual(rule(VariantCalls("101TW")), 20)
+        self.assertEqual(rule(VariantCalls("100G 101TW")), 20)
 
     def test_score_residues(self):
         rule = HCVR("SCORE FROM ( 100G => 10, 101D => 20 )")
         expected_residue = repr({Mutation('S100G')})
 
-        result = rule.dtree(VariantCalls("S100G R102G"))
+        result = rule.dtree(VariantCalls("S100G R101d"))
 
         self.assertEqual(expected_residue, repr(result.residues))
 
     def test_score_from_max(self):
         rule = HCVR("SCORE FROM (MAX (100G => 10, 101D => 20, 102D => 30))")
-        self.assertEqual(rule(VariantCalls("100G 101D")), 20)
-        self.assertEqual(rule(VariantCalls("10G 11D")), False)
+        self.assertEqual(rule(VariantCalls("100G 101D 102d")), 20)
 
     def test_score_from_max_neg(self):
         rule = HCVR("SCORE FROM (MAX (100G => -10, 101D => -20, 102D => 30))")
-        self.assertEqual(rule(VariantCalls("100G 101D")), -10)
-        self.assertEqual(rule(VariantCalls("10G 11D")), False)
+        self.assertEqual(-10, rule(VariantCalls("100G 101D 102d")))
 
     def test_bool_and(self):
         rule = HCVR("1G AND (2T AND 7Y)")
         self.assertEqual(rule(VariantCalls("2T 7Y 1G")), True)
-        self.assertEqual(rule(VariantCalls("2T 3Y 1G")), False)
+        self.assertEqual(rule(VariantCalls("2T 7d 1G")), False)
         self.assertEqual(rule(VariantCalls("7Y 1G 2T")), True)
-        self.assertEqual(rule([]), False)
+        with self.assertRaisesRegex(MissingPositionError,
+                                    r"Missing position 1"):
+            rule([])
 
     def test_bool_constants(self):
         rule = HCVR("TRUE OR 1G")
-        self.assertEqual(rule(VariantCalls("2G")), True)
+        self.assertEqual(rule(VariantCalls("1d")), True)
         rule = HCVR("FALSE AND 1G")
         self.assertEqual(rule(VariantCalls("1G")), False)
         rule = HCVR("TRUE OR (FALSE AND TRUE)")
@@ -99,16 +109,18 @@ class TestRuleSemantics(unittest.TestCase):
 
     def test_bool_or(self):
         rule = HCVR("1G OR (2T OR 7Y)")
-        self.assertTrue(rule(VariantCalls("2T")))
-        self.assertFalse(rule(VariantCalls("3T")))
-        self.assertTrue(rule(VariantCalls("1G")))
-        self.assertFalse(rule([]))
+        self.assertTrue(rule(VariantCalls("1d 2T 7d")))
+        self.assertFalse(rule(VariantCalls("1d 2d 7d")))
+        self.assertTrue(rule(VariantCalls("1G 2d 7d")))
+        with self.assertRaisesRegex(MissingPositionError,
+                                    r"Missing position 1"):
+            rule([])
 
     def test_select_from_atleast(self):
         rule = HCVR("SELECT ATLEAST 2 FROM (2T, 7Y, 3G)")
-        self.assertTrue(rule(VariantCalls("2T 7Y 1G")))
-        self.assertFalse(rule(VariantCalls("2T 4Y 5G")))
-        self.assertTrue(rule(VariantCalls("3G 9Y 2T")))
+        self.assertTrue(rule(VariantCalls("2T 7Y 3d")))
+        self.assertFalse(rule(VariantCalls("2T 7d 3d")))
+        self.assertTrue(rule(VariantCalls("3G 7d 2T")))
 
     def test_score_from_exactly(self):
         rule = HCVR("SELECT EXACTLY 1 FROM (2T, 7Y)")
@@ -116,11 +128,11 @@ class TestRuleSemantics(unittest.TestCase):
         self.assertEqual(0, score)
 
     def test_score_comment(self):
-        rule = HCVR("SCORE FROM (100G => 10, 200T => 3, 100S => \"flag1 with_space\")")
-        self.assertEqual(rule(VariantCalls("100G")), 10)
+        rule = HCVR('SCORE FROM (100G => 10, 200T => 3, 100S => "flag1 with_space")')
+        self.assertEqual(rule(VariantCalls("100G 200d")), 10)
         result = rule.dtree(VariantCalls("100S 200T"))
         self.assertEqual(result.score, 3)
-        self.assertTrue("flag1 with_space" in result.flags)
+        self.assertIn("flag1 with_space", result.flags)
 
     def test_parse_exception(self):
         expected_error_message = (
@@ -146,9 +158,26 @@ SCORE FROM (
         self.assertEqual(expected_error_message, str(context.exception))
 
 
+def add_mutations(text):
+    """ Add a small set of mutations to an RT wild type. """
+
+    # Start of RT reference.
+    ref = ("PISPIETVPVKLKPGMDGPKVKQWPLTEEKIKALVEICTEMEKEGKISKIGPENPYNTPVFA"
+           "IKKKDSTKWRKLVDFRELNKRTQDFWEVQLGIPHPAGLKKKKSVTVLDVGDAYFSVPLDEDF"
+           "RKYTAFTIPSINNETPGIRYQYNVLPQGWKGSPAIFQSSMTKILEPFRKQNPDIVIYQYMDD"
+           "LYVGSDLEIGQHRTKIEELRQHLLRWGLTTPDKKHQK")
+    seq = list(ref)
+    changes = VariantCalls(text)
+    for mutation_set in changes:
+        seq[mutation_set.pos - 1] = [m.variant for m in mutation_set]
+    return VariantCalls(reference=ref, sample=seq)
+
+
 class TestActualRules(unittest.TestCase):
     def test_hivdb_rules_parse(self):
-        for line in open("pyvdrm/tests/HIVDB.rules"):
+        folder = os.path.dirname(__file__)
+        rules_file = os.path.join(folder, 'HIVDB.rules')
+        for line in open(rules_file):
             r = HCVR(line)
             self.assertEqual(line, r.rule)
 
@@ -172,10 +201,10 @@ class TestActualRules(unittest.TestCase):
         215FY) => 10), MAX ((41L AND 215ACDEILNSV) => 5, (41L AND 215FY) =>
         15))
         """)
-        self.assertEqual(rule(VariantCalls("40F 41L 210W 215Y")), 65)
-        self.assertEqual(rule(VariantCalls("41L 210W 215F")), 60)
-        self.assertEqual(rule(VariantCalls("40F 210W 215Y")), 25)
-        self.assertEqual(rule(VariantCalls("40F 67G 215Y")), 15)
+        self.assertEqual(rule(add_mutations("40F 41L 210W 215Y")), 65)
+        self.assertEqual(rule(add_mutations("41L 210W 215F")), 60)
+        self.assertEqual(rule(add_mutations("40F 210W 215Y")), 25)
+        self.assertEqual(rule(add_mutations("40F 67G 215Y")), 15)
 
 
 class TestAsiMutations(unittest.TestCase):
@@ -186,22 +215,9 @@ class TestAsiMutations(unittest.TestCase):
         self.assertEqual(expected_mutation_set, m.mutations)
         self.assertEqual(expected_mutation_set.wildtype, m.mutations.wildtype)
 
-    def test_init_none(self):
-        m = AsiMutations()
-
-        self.assertIsNone(m.mutations)
-
     def test_repr(self):
         expected_repr = "AsiMutations(args='Q80KR')"
         m = AsiMutations(args='Q80KR')
-
-        r = repr(m)
-
-        self.assertEqual(expected_repr, r)
-
-    def test_repr_none(self):
-        expected_repr = "AsiMutations()"
-        m = AsiMutations()
 
         r = repr(m)
 

@@ -8,6 +8,10 @@ class AsiParseError(Exception):
     pass
 
 
+class MissingPositionError(Exception):
+    pass
+
+
 class DRMParser(metaclass=ABCMeta):
     """abstract class for DRM rule parsers/evaluators"""
 

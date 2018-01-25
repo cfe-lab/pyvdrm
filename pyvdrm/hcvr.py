@@ -4,44 +4,20 @@ HCV Drug Resistance Rule Parser definition
 
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
-                       infixNotation, delimitedList, opAssoc, alphas, ParseException)
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, AsiUnaryExpr, DRMParser
+                       infixNotation, delimitedList, opAssoc, ParseException)
+
+from pyvdrm.drm import MissingPositionError
+from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser
 from pyvdrm.vcf import MutationSet
+
 
 def update_flags(fst, snd):
     for k in snd:
         if k in fst:
             fst[k].append(snd[k])
         else:
-            fst[k] = snd[k] # this chould be achieved with a defaultdict
+            fst[k] = snd[k]  # this could be achieved with a defaultdict
     return fst
-
-
-def maybe_foldl(func, noneable):
-    """Safely fold a function over a potentially empty list of
-    potentially null values"""
-    if noneable is None:
-        return None
-    clean = [x for x in noneable if x is not None]
-    if not clean:
-        return None
-    return reduce(func, clean)
-
-
-def maybe_map(func, noneable):
-    if noneable is None:
-        return None
-    r_list = []
-    for x in noneable:
-        if x is None:
-            continue
-        result = func(x)
-        if result is None:
-            continue
-        r_list.append(result)
-    if not r_list:
-        return None
-    return r_list
 
 
 @total_ordering
@@ -65,13 +41,15 @@ class Score(object):
 
     def __add__(self, other):
         flags = update_flags(self.flags, other.flags)
-        return Score(self.score + other.score, self.residues | other.residues,
-                flags)
+        return Score(self.score + other.score,
+                     self.residues | other.residues,
+                     flags)
 
     def __sub__(self, other):
         flags = update_flags(self.flags, other.flags)
-        return Score(self.score - other.score, self.residues | other.residues,
-                flags)
+        return Score(self.score - other.score,
+                     self.residues | other.residues,
+                     flags)
 
     def __repr__(self):
         return "Score({!r}, {!r})".format(self.score, self.residues)
@@ -166,11 +144,11 @@ class ScoreExpr(AsiExpr):
         if len(self.children) == 4:
             operation, _, flag, _ = self.children
             flags[flag] = []
-            score = 0 # should be None
+            score = 0  # should be None
 
         elif len(self.children) == 3:
             operation, minus, score = self.children
-            if minus != '-': # this is parsing the expression twice, refactor
+            if minus != '-':  # this is parsing the expression twice, refactor
                 raise ValueError
             score = -1 * int(score)
 
@@ -197,10 +175,22 @@ class ScoreList(AsiExpr):
     def __call__(self, mutations):
         operation, *rest = self.children
         if operation == 'MAX':
-            return maybe_foldl(max, [f(mutations) for f in rest])
-
-        # the default operation is sum
-        return maybe_foldl(lambda x, y: x+y, [f(mutations) for f in self.children])
+            terms = rest
+            func = max
+        else:
+            # the default operation is sum
+            terms = self.children
+            func = sum
+        scores = [f(mutations) for f in terms]
+        matched_scores = [score.score for score in scores if score.score]
+        residues = reduce(lambda x, y: x | y,
+                          (score.residues for score in scores))
+        flags = {}
+        for score in scores:
+            flags.update(score.flags)
+        return Score(bool(matched_scores) and func(matched_scores),
+                     residues,
+                     flags)
 
 
 class SelectFrom(AsiExpr):
@@ -215,14 +205,12 @@ class SelectFrom(AsiExpr):
         operation, *rest = self.children
         # the head of the arg list must be an equality expression
        
-        scored = list(maybe_map(lambda f: f(mutations), rest))
-        passing = len(scored) 
+        scored = [f(mutations) for f in rest]
+        passing = sum(bool(score.score) for score in scored)
 
-        if operation(passing):
-            return Score(True, maybe_foldl(
-                lambda x, y: x.residues.union(y.residues), scored))
-        else:
-            return None
+        return Score(operation(passing),
+                     reduce(lambda x, y: x | y,
+                            (item.residues for item in scored)))
 
 
 class AsiScoreCond(AsiExpr):
@@ -232,7 +220,7 @@ class AsiScoreCond(AsiExpr):
 
     def __call__(self, args):
         """Score conditions evaluate a list of expressions and sum scores"""
-        return maybe_foldl(lambda x, y: x+y, map(lambda x: x(args), self.children))
+        return sum((f(args) for f in self.children), Score(False, set()))
 
 
 class AsiMutations(object):
@@ -241,7 +229,7 @@ class AsiMutations(object):
     def __init__(self, _label=None, _pos=None, args=None):
         """Initialize set of mutations from a potentially ambiguous residue
         """
-        self.mutations = args and MutationSet(''.join(args))
+        self.mutations = MutationSet(''.join(args))
 
     def __repr__(self):
         if self.mutations is None:
@@ -249,13 +237,18 @@ class AsiMutations(object):
         return "AsiMutations(args={!r})".format(str(self.mutations))
 
     def __call__(self, env):
+        is_found = False
         for mutation_set in env:
+            is_found |= mutation_set.pos == self.mutations.pos
             intersection = self.mutations.mutations & mutation_set.mutations
             if len(intersection) > 0:
                 return Score(True, intersection)
 
-        # the mutationset has no members in the environment
-        return None
+        if not is_found:
+            # Some required positions were not found in the environment.
+            raise MissingPositionError('Missing position {}.'.format(
+                self.mutations.pos))
+        return Score(False, set())
 
 
 class HCVR(DRMParser):
@@ -305,8 +298,8 @@ class HCVR(DRMParser):
         selectstatement = select + select_quantifier + from_ + residue_list
         selectstatement.setParseAction(SelectFrom)
 
-        bool_ = Literal('TRUE').suppress().setParseAction(BoolTrue) |\
-                Literal('FALSE').suppress().setParseAction(BoolFalse)
+        bool_ = (Literal('TRUE').suppress().setParseAction(BoolTrue) |
+                 Literal('FALSE').suppress().setParseAction(BoolFalse))
 
         booleancondition = Forward()
         condition = residue | excludestatement | selectstatement | bool_
