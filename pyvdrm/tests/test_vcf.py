@@ -340,6 +340,15 @@ class TestVariantCalls(unittest.TestCase):
 
         self.assertEqual(expected_calls, calls)
 
+    def test_init_empty_sequence(self):
+        reference = 'ACHE'
+        sample = ['IN', 'C', '', 'E']
+        expected_calls = VariantCalls('A1IN C2C E4E')
+
+        calls = VariantCalls(reference=reference, sample=sample)
+
+        self.assertEqual(expected_calls, calls)
+
     def test_init_bad_length(self):
         reference = 'ACHE'
         sample = 'ICREL'

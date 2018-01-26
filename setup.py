@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='pyvdrm',
-    version='0.3.0',
+    version='0.3.1',
     description='',
 
     url='',
@@ -14,5 +14,4 @@ setup(
     install_requires=['pyparsing'],
 
     setup_requires=['pytest-runner'],
-    tests_require=['pytest']
-)
+    tests_require=['pytest'])

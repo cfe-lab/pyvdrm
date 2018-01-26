@@ -38,7 +38,8 @@ class VariantCalls(namedtuple('VariantCalls', 'mutation_sets reference')):
             mutation_sets = {MutationSet(pos=i, variants=alt, wildtype=ref)
                              for i, (alt, ref) in enumerate(zip(sample,
                                                                 reference),
-                                                            1)}
+                                                            1)
+                             if alt}
         positions = set()
         for mutation_set in mutation_sets:
             if mutation_set.pos in positions:
