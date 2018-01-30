@@ -7,98 +7,32 @@ from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
                        infixNotation, delimitedList, opAssoc, ParseException)
 
 from pyvdrm.drm import MissingPositionError
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser
+from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser, BoolScore, IntScore
 from pyvdrm.vcf import MutationSet
 
-
-def update_flags(fst, snd):
-    for k in snd:
-        if k in fst:
-            fst[k].append(snd[k])
-        else:
-            fst[k] = snd[k]  # this could be achieved with a defaultdict
-    return fst
-
-
-@total_ordering
-class Score(object):
-    """Encapsulate a score and the residues that support it"""
-
-    def __init__(self, score, residues, flags=None):
-        """ Initialize.
-
-        :param bool|float score: value of the score
-        :param residues: sequence of Mutations
-        :param flags: dictionary of user defined strings and supporting Mutations
-        """
-        self.score = score
-        self.residues = set(residues)
-
-        if flags is None:
-            self.flags = {}
-        else:
-            self.flags = flags
-
-    def __add__(self, other):
-        flags = update_flags(self.flags, other.flags)
-        return Score(self.score + other.score,
-                     self.residues | other.residues,
-                     flags)
-
-    def __sub__(self, other):
-        flags = update_flags(self.flags, other.flags)
-        return Score(self.score - other.score,
-                     self.residues | other.residues,
-                     flags)
-
-    def __repr__(self):
-        return "Score({!r}, {!r})".format(self.score, self.residues)
-
-    def __eq__(self, other):
-        return self.score == other.score
-
-    def __lt__(self, other):
-        # the total_ordering decorator populates the other 5 comparison
-        # operations. Implement them explicitly if this causes performance
-        # issues
-        return self.score < other.score
-
-    def __bool__(self):
-        return self.score
 
 
 class BoolTrue(AsiExpr):
     """Boolean True constant"""
     def __call__(self, *args):
-        return Score(True, [])
+        return BoolScore(True, [])
 
 
 class BoolFalse(AsiExpr):
     """Boolean False constant"""
     def __call__(self, *args):
-        return Score(False, [])
+        return BoolScore(False, [])
 
 
-class AndExpr(AsiExpr):
+class AndExpr(DrmExpr):
     """Fold boolean AND on children"""
 
     def __call__(self, mutations):
         scores = map(lambda f: f(mutations), self.children[0])
-        scores = [Score(False, []) if s is None else s for s in scores]
-        if not scores:
-            raise ValueError
-
-        residues = set()
-
-        for s in scores:
-            residues |= s.residues
-            if not s.score:
-                return Score(False, [])
-
-        return Score(True, residues)
+        return reduce(op.__and__, scores)
 
 
-class OrExpr(AsiBinaryExpr):
+class OrExpr(DrmBinaryExpr):
     """Boolean OR on children (binary only)"""
 
     def __call__(self, mutations):
@@ -112,11 +46,10 @@ class OrExpr(AsiBinaryExpr):
         if score2 is None:
             score2 = Score(False, [])
 
-        return Score(score1.score or score2.score,
-                     score1.residues | score2.residues)
+        return score1 | score2
 
 
-class EqualityExpr(AsiExpr):
+class EqualityExpr(DrmExpr):
     """ASI2 style inequality expressions"""
 
     def __init__(self, label, pos, children):
@@ -135,7 +68,7 @@ class EqualityExpr(AsiExpr):
         raise NotImplementedError
 
 
-class ScoreExpr(AsiExpr):
+class ScoreExpr(DrmExpr):
     """Score expressions propagate DRM scores"""
 
     def __call__(self, mutations):
@@ -165,11 +98,11 @@ class ScoreExpr(AsiExpr):
             return None
 
         if result.score is False:
-            return Score(0, [])
-        return Score(score, result.residues, flags=flags)
+            return IntScore(0, [])
+        return IntScore(score, result.residues, flags=flags)
 
 
-class ScoreList(AsiExpr):
+class ScoreList(DrmExpr):
     """Lists of scores are either summed or maxed"""
 
     def __call__(self, mutations):
@@ -181,48 +114,36 @@ class ScoreList(AsiExpr):
             # the default operation is sum
             terms = self.children
             func = sum
-        scores = [f(mutations) for f in terms]
-        matched_scores = [score.score for score in scores if score.score]
-        residues = reduce(lambda x, y: x | y,
-                          (score.residues for score in scores))
-        flags = {}
-        for score in scores:
-            flags.update(score.flags)
-        return Score(bool(matched_scores) and func(matched_scores),
-                     residues,
-                     flags)
+
+        return func([f(mutations) for f in terms])
 
 
-class SelectFrom(AsiExpr):
+class SelectFrom(DrmExpr):
     """Return True if some number of mutations match"""
-
-    def typecheck(self, tokens):
-        # if type(tokens[0]) != EqualityExpr:
-        #     raise TypeError()
-        pass
 
     def __call__(self, mutations):
         operation, *rest = self.children
         # the head of the arg list must be an equality expression
        
         scored = [f(mutations) for f in rest]
-        passing = sum(bool(score.score) for score in scored)
+        passing = [score.score for score in scored].count(True)
 
-        return Score(operation(passing),
-                     reduce(lambda x, y: x | y,
-                            (item.residues for item in scored)))
+        return IntScore(operation(passing),
+                        reduce(lambda x, y: x | y,
+                               (item.residues for item in scored)))
 
 
-class AsiScoreCond(AsiExpr):
+class AsiScoreCond(DrmExpr):
     """Score condition"""
 
     label = "ScoreCond"
 
     def __call__(self, args):
         """Score conditions evaluate a list of expressions and sum scores"""
-        return sum((f(args) for f in self.children), Score(False, set()))
+        return sum((f(args) for f in self.children), IntScore(0, set()))
 
 
+# eval AsiMutations Env -> Bool
 class AsiMutations(object):
     """List of mutations given an ambiguous pattern"""
 
@@ -240,13 +161,13 @@ class AsiMutations(object):
             is_found |= mutation_set.pos == self.mutations.pos
             intersection = self.mutations.mutations & mutation_set.mutations
             if len(intersection) > 0:
-                return Score(True, intersection)
+                return BoolScore(True, intersection)
 
         if not is_found:
             # Some required positions were not found in the environment.
             raise MissingPositionError('Missing position {}.'.format(
                 self.mutations.pos))
-        return Score(False, set())
+        return BoolScore(False, set())
 
 
 class HCVR(DRMParser):

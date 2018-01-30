@@ -3,6 +3,70 @@
 
 from abc import ABCMeta, abstractmethod
 
+class Score(object):
+    """Encapsulate a score and the residues that support it"""
+
+    def __init__(self, score, residues, flags=None):
+        """ Initialize.
+
+        :param score: value of the score
+        :param residues: sequence of Mutations
+        :param flags: dictionary of user defined strings and supporting Mutations
+        """
+        self.score = score
+        self.residues = set(residues)
+
+        if flags is None:
+            self.flags = {}
+        else:
+            self.flags = flags
+    
+    @staticmethod
+    def update_flags(fst, snd):
+        for k in snd:
+            if k in fst:
+                fst[k].append(snd[k])
+            else:
+                fst[k] = snd[k]  # this could be achieved with a defaultdict
+        return fst
+
+    def __repr__(self):
+        return "{!r}({!r}, {!r})".format(self.__class__.__name__,
+                                         self.score,
+                                         self.residues)
+
+
+@total_ordering
+class IntScore(Score):
+    def __add__(self, other):
+        flags = self.update_flags(self.flags, other.flags)
+        return Score(self.score + other.score,
+                     self.residues | other.residues,
+                     flags)
+
+    def __sub__(self, other):
+        flags = self.update_flags(self.flags, other.flags)
+        return Score(self.score - other.score,
+                     self.residues | other.residues,
+                     flags)
+
+    def __eq__(self, other):
+        return self.score == other.score
+
+    def __lt__(self, other):
+        # the total_ordering decorator populates the other 5 comparison
+        # operations. Implement them explicitly if this causes performance
+        # issues
+        return self.score < other.score
+
+    def __bool__(self):
+        raise TypeError
+
+
+class BoolScore(Score):
+    def __eq__(self, other):
+        return self.score == other.score
+
 
 class AsiParseError(Exception):
     pass
@@ -37,7 +101,7 @@ class DRMParser(metaclass=ABCMeta):
         return self.rule
 
 
-class AsiExpr(object):
+class DrmExpr(object):
     """A callable ASI2 expression"""
 
     children = []
@@ -61,7 +125,7 @@ class AsiExpr(object):
         return self.children(args)
 
 
-class AsiBinaryExpr(AsiExpr):
+class DrmBinaryExpr(AsiExpr):
     """Subclass with syntactic sugar for boolean ops"""
 
     def __init__(self, label, pos, tokens):
@@ -77,7 +141,7 @@ class AsiBinaryExpr(AsiExpr):
         return "{} {} {}".format(arg1, type(self), arg2)
 
 
-class AsiUnaryExpr(AsiExpr):
+class DrmUnaryExpr(AsiExpr):
     """Subclass for atoms and unary ops"""
 
     def typecheck(self, tokens):
