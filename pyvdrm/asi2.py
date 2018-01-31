@@ -101,6 +101,9 @@ class EqualityExpr(AsiExpr):
         self.limit = int(limit)
 
     def __call__(self, x):
+        if type(self.limit) is not type(x):
+            raise TypeError
+
         if self.operation == 'ATLEAST':
             return x >= self.limit
         elif self.operation == 'EXACTLY':
