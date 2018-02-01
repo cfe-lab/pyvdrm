@@ -1,6 +1,7 @@
 """Asi2 specification
 """
 
+from functools import total_ordering
 from abc import ABCMeta, abstractmethod
 
 class Score(object):
@@ -31,7 +32,7 @@ class Score(object):
         return fst
 
     def __repr__(self):
-        return "{!r}({!r}, {!r})".format(self.__class__.__name__,
+        return "Score({!r}, {!r})".format(#self.__class__.__name__,
                                          self.score,
                                          self.residues)
 
@@ -40,15 +41,26 @@ class Score(object):
 class IntScore(Score):
     def __add__(self, other):
         flags = self.update_flags(self.flags, other.flags)
-        return Score(self.score + other.score,
-                     self.residues | other.residues,
-                     flags)
+
+        # Here is where we define the arithmetic behaviour of flag terms
+        result = self.score 
+        if not other.score is None:
+            result = self.score + other.score
+
+        return IntScore(result,
+                        self.residues | other.residues,
+                        flags)
 
     def __sub__(self, other):
         flags = self.update_flags(self.flags, other.flags)
-        return Score(self.score - other.score,
-                     self.residues | other.residues,
-                     flags)
+
+        result = self.score
+        if not other.score is None:
+            result = self.score - other.score
+
+        return IntScore(result,
+                        self.residues | other.residues,
+                        flags)
 
     def __eq__(self, other):
         return self.score == other.score
@@ -57,15 +69,38 @@ class IntScore(Score):
         # the total_ordering decorator populates the other 5 comparison
         # operations. Implement them explicitly if this causes performance
         # issues
+
+        if other.score is None:
+            raise TypeError
+
         return self.score < other.score
 
     def __bool__(self):
         raise TypeError
 
+    def __int__(self):
+        return self.score
+
 
 class BoolScore(Score):
     def __eq__(self, other):
+        # is this used?
         return self.score == other.score
+
+    def __and__(self, other):
+        flags = self.update_flags(self.flags, other.flags)
+        if self.score and other.score:
+            return BoolScore(True, self.residues | other.residues, flags)
+        return BoolScore(False, set())
+
+    def __or__(self, other):
+        flags = self.update_flags(self.flags, other.flags)
+        if self.score or other.score:
+            return BoolScore(True, self.residues | other.residues, flags)
+        return BoolScore(False, set())
+
+    def __int__(self):
+        raise TypeError
 
 
 class AsiParseError(Exception):
@@ -107,16 +142,16 @@ class DrmExpr(object):
     children = []
     label = None
 
-    def __init__(self, _label, _pos, tokens):
+    def __init__(self, _label, _pos, terms):
         """By default we assume the head of the arg list is the operation"""
 
-        self.typecheck(tokens.asList())
-        self.children = tokens
+        self.typecheck(terms.asList())
+        self.children = terms
 
         if not self.label:
             self.label = str(type(self))
 
-    def typecheck(self, tokens):
+    def typecheck(self, terms):
         """Override typecheck method to define runtime errors"""
         pass
 
@@ -125,7 +160,7 @@ class DrmExpr(object):
         return self.children(args)
 
 
-class DrmBinaryExpr(AsiExpr):
+class DrmBinaryExpr(DrmExpr):
     """Subclass with syntactic sugar for boolean ops"""
 
     def __init__(self, label, pos, tokens):
@@ -141,7 +176,7 @@ class DrmBinaryExpr(AsiExpr):
         return "{} {} {}".format(arg1, type(self), arg2)
 
 
-class DrmUnaryExpr(AsiExpr):
+class DrmUnaryExpr(DrmExpr):
     """Subclass for atoms and unary ops"""
 
     def typecheck(self, tokens):

@@ -3,8 +3,8 @@ import unittest
 
 from pyparsing import ParseException
 
-from pyvdrm.drm import MissingPositionError
-from pyvdrm.hcvr import HCVR, AsiMutations, Score
+from pyvdrm.drm import MissingPositionError, IntScore, BoolScore
+from pyvdrm.hcvr import HCVR, AsiMutations
 from pyvdrm.vcf import Mutation, MutationSet, VariantCalls
 
 from pyvdrm.tests.test_vcf import add_mutations
@@ -216,14 +216,14 @@ class TestScore(unittest.TestCase):
         expected_value = 10
         expected_mutations = {Mutation('A23R')}
 
-        score = Score(expected_value, expected_mutations)
+        score = IntScore(expected_value, expected_mutations)
 
         self.assertEqual(expected_value, score.score)
         self.assertEqual(expected_mutations, set(score.residues))
 
     def test_repr(self):
         expected_repr = "Score(10, {Mutation('A23R')})"
-        score = Score(10, {Mutation('A23R')})
+        score = IntScore(10, {Mutation('A23R')})
 
         r = repr(score)
 

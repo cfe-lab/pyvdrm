@@ -2,23 +2,25 @@
 HCV Drug Resistance Rule Parser definition
 """
 
-from functools import reduce, total_ordering
+from functools import reduce
+import operator as op
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
-                       infixNotation, delimitedList, opAssoc, ParseException)
+                       infixNotation, delimitedList, opAssoc,
+                       ParseException)
 
 from pyvdrm.drm import MissingPositionError
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser, BoolScore, IntScore
+from pyvdrm.drm import (DrmExpr, DrmBinaryExpr, DRMParser, BoolScore,
+                        IntScore)
 from pyvdrm.vcf import MutationSet
 
 
-
-class BoolTrue(AsiExpr):
+class BoolTrue(DrmExpr):
     """Boolean True constant"""
     def __call__(self, *args):
         return BoolScore(True, [])
 
 
-class BoolFalse(AsiExpr):
+class BoolFalse(DrmExpr):
     """Boolean False constant"""
     def __call__(self, *args):
         return BoolScore(False, [])
@@ -33,20 +35,11 @@ class AndExpr(DrmExpr):
 
 
 class OrExpr(DrmBinaryExpr):
-    """Boolean OR on children (binary only)"""
+    """Boolean OR on children"""
 
     def __call__(self, mutations):
-        arg1, arg2 = self.children
-
-        score1 = arg1(mutations)
-        score2 = arg2(mutations)
-
-        if score1 is None:
-            score1 = Score(False, [])
-        if score2 is None:
-            score2 = Score(False, [])
-
-        return score1 | score2
+        left, right = self.children
+        return left(mutations) | right(mutations)
 
 
 class EqualityExpr(DrmExpr):
@@ -69,7 +62,9 @@ class EqualityExpr(DrmExpr):
 
 
 class ScoreExpr(DrmExpr):
-    """Score expressions propagate DRM scores"""
+    """Terminal expressions of rule AST
+       Bool -> Int 
+    """
 
     def __call__(self, mutations):
 
@@ -77,11 +72,11 @@ class ScoreExpr(DrmExpr):
         if len(self.children) == 4:
             operation, _, flag, _ = self.children
             flags[flag] = []
-            score = 0  # should be None
+            score = None
 
         elif len(self.children) == 3:
             operation, minus, score = self.children
-            if minus != '-':  # this is parsing the expression twice, refactor
+            if minus != '-':  # parses the expression twice, refactor
                 raise ValueError
             score = -1 * int(score)
 
@@ -94,11 +89,16 @@ class ScoreExpr(DrmExpr):
 
         # evaluate operation and return score
         result = operation(mutations)
+
         if result is None:
+            # this is where we raise an error if there are missing positions
             return None
 
-        if result.score is False:
-            return IntScore(0, [])
+        if not isinstance(result, BoolScore):
+            raise TypeError
+
+        if not result.score:
+            return None
         return IntScore(score, result.residues, flags=flags)
 
 
@@ -113,9 +113,14 @@ class ScoreList(DrmExpr):
         else:
             # the default operation is sum
             terms = self.children
-            func = sum
+            func = op.__add__
 
-        return func([f(mutations) for f in terms])
+        scores = list(filter(lambda x: x is not None,
+                             [f(mutations) for f in terms]))
+        if scores == []:
+            return IntScore(0, set())
+
+        return reduce(func, scores)
 
 
 class SelectFrom(DrmExpr):
@@ -161,6 +166,7 @@ class AsiMutations(object):
             is_found |= mutation_set.pos == self.mutations.pos
             intersection = self.mutations.mutations & mutation_set.mutations
             if len(intersection) > 0:
+                # does this return too soon?
                 return BoolScore(True, intersection)
 
         if not is_found:
@@ -225,9 +231,11 @@ class HCVR(DRMParser):
 
         booleancondition << infixNotation(condition,
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
-                                           (or_, 2, opAssoc.LEFT, OrExpr)]) | condition
+                                           (or_, 2, opAssoc.LEFT, OrExpr)]) |\
+                            condition
 
-        score = Optional(Literal('-')) + integer | quote + Regex(r'[a-zA-Z0-9 _]+') + quote
+        score = Optional(Literal('-')) + integer |\
+                         quote + Regex(r'[a-zA-Z0-9 _]+') + quote
         scoreitem = booleancondition + mapper + score
         scoreitem.setParseAction(ScoreExpr)
         scorelist = max_ + l_par + delimitedList(scoreitem) + r_par |\
