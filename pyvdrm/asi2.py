@@ -5,7 +5,7 @@ ASI2 Parser definition
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
                        infixNotation, delimitedList, opAssoc, ParseException)
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser, MissingPositionError
+from pyvdrm.drm import DrmExpr, DrmBinaryExpr, DRMParser, MissingPositionError
 from pyvdrm.vcf import MutationSet
 
 
@@ -47,7 +47,7 @@ class Score(object):
         return self.score
 
 
-class Negate(AsiExpr):
+class Negate(DrmExpr):
     """Unary negation of boolean child"""
     def __call__(self, mutations):
         child_score = self.children[0](mutations)
@@ -56,7 +56,7 @@ class Negate(AsiExpr):
         return Score(not child_score.score, child_score.residues)
 
 
-class AndExpr(AsiExpr):
+class AndExpr(DrmExpr):
     """Fold boolean AND on children"""
 
     def __call__(self, mutations):
@@ -74,7 +74,7 @@ class AndExpr(AsiExpr):
         return Score(True, residues)
 
 
-class OrExpr(AsiBinaryExpr):
+class OrExpr(DrmBinaryExpr):
     """Boolean OR on children (binary only)"""
 
     def __call__(self, mutations):
@@ -92,7 +92,7 @@ class OrExpr(AsiBinaryExpr):
                      score1.residues | score2.residues)
 
 
-class EqualityExpr(AsiExpr):
+class EqualityExpr(DrmExpr):
     """ASI2 inequality expressions"""
 
     def __init__(self, label, pos, children):
@@ -101,9 +101,6 @@ class EqualityExpr(AsiExpr):
         self.limit = int(limit)
 
     def __call__(self, x):
-        if type(self.limit) is not type(x):
-            raise TypeError
-
         if self.operation == 'ATLEAST':
             return x >= self.limit
         elif self.operation == 'EXACTLY':
@@ -114,7 +111,7 @@ class EqualityExpr(AsiExpr):
         raise NotImplementedError
 
 
-class ScoreExpr(AsiExpr):
+class ScoreExpr(DrmExpr):
     """Score expressions propagate DRM scores"""
 
     def __call__(self, mutations):
@@ -139,7 +136,7 @@ class ScoreExpr(AsiExpr):
         return Score(score, result.residues)
 
 
-class ScoreList(AsiExpr):
+class ScoreList(DrmExpr):
     """Lists of scores are either summed or maxed"""
 
     def __call__(self, mutations):
@@ -158,7 +155,7 @@ class ScoreList(AsiExpr):
         return Score(bool(matched_scores) and func(matched_scores), residues)
 
 
-class SelectFrom(AsiExpr):
+class SelectFrom(DrmExpr):
     """Return True if some number of mutations match"""
 
     def typecheck(self, tokens):
@@ -178,7 +175,7 @@ class SelectFrom(AsiExpr):
                             (item.residues for item in scored)))
 
 
-class AsiScoreCond(AsiExpr):
+class AsiScoreCond(DrmExpr):
     """Score condition"""
 
     label = "ScoreCond"
