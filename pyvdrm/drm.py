@@ -38,6 +38,28 @@ class Score(object):
 
 
 @total_ordering
+class Asi2Score(Score):
+    """The Asi2Score object may carry and integer or boolean score"""
+
+    def __add__(self, other):
+        return Asi2Score(self.score + other.score,
+                         self.residues | other.residues)
+
+    def __sub__(self, other):
+        return Asi2Score(self.score - other.score,
+                         self.residues | other.residues)
+
+    def __eq__(self, other):
+        return self.score == other.score
+
+    def __lt__(self, other):
+        return self.score < other.score
+
+    def __bool__(self):
+        return self.score
+
+
+@total_ordering
 class IntScore(Score):
     def __add__(self, other):
         flags = self.update_flags(self.flags, other.flags)

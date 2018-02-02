@@ -5,46 +5,9 @@ ASI2 Parser definition
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
                        infixNotation, delimitedList, opAssoc, ParseException)
-from pyvdrm.drm import DrmExpr, DrmBinaryExpr, DRMParser, MissingPositionError
+from pyvdrm.drm import (DrmExpr, DrmBinaryExpr, DRMParser,
+                        MissingPositionError, Asi2Score)
 from pyvdrm.vcf import MutationSet
-
-
-@total_ordering
-class Score(object):
-    """Encapsulate a score and the residues that support it"""
-
-    residues = set([])
-    score = None
-
-    def __init__(self, score, residues):
-        """ Initialize.
-
-        :param bool|float score: value of the score
-        :param residues: sequence of Mutations
-        """
-        self.score = score
-        self.residues = set(residues)
-
-    def __add__(self, other):
-        return Score(self.score + other.score, self.residues | other.residues)
-
-    def __sub__(self, other):
-        return Score(self.score - other.score, self.residues | other.residues)
-
-    def __repr__(self):
-        return "Score({!r}, {!r})".format(self.score, self.residues)
-
-    def __eq__(self, other):
-        return self.score == other.score
-
-    def __lt__(self, other):
-        # the total_ordering decorator populates the other 5 comparison
-        # operations. Implement them explicitly if this causes performance
-        # issues
-        return self.score < other.score
-
-    def __bool__(self):
-        return self.score
 
 
 class Negate(DrmExpr):
@@ -52,8 +15,8 @@ class Negate(DrmExpr):
     def __call__(self, mutations):
         child_score = self.children[0](mutations)
         if child_score is None:
-            return Score(True, [])  # TODO: propagate negative residues
-        return Score(not child_score.score, child_score.residues)
+            return Asi2Score(True, [])  # TODO: propagate negative residues
+        return Asi2Score(not child_score.score, child_score.residues)
 
 
 class AndExpr(DrmExpr):
@@ -61,17 +24,17 @@ class AndExpr(DrmExpr):
 
     def __call__(self, mutations):
         scores = map(lambda f: f(mutations), self.children[0])
-        scores = [Score(False, []) if s is None else s for s in scores]
+        scores = [Asi2Score(False, []) if s is None else s for s in scores]
         if not scores:
             raise ValueError
 
         residues = set([])
         for s in scores:
             if not s.score:
-                return Score(False, [])
+                return Asi2Score(False, [])
             residues = residues | s.residues
 
-        return Score(True, residues)
+        return Asi2Score(True, residues)
 
 
 class OrExpr(DrmBinaryExpr):
@@ -84,11 +47,11 @@ class OrExpr(DrmBinaryExpr):
         score2 = arg2(mutations)
 
         if score1 is None:
-            score1 = Score(False, [])
+            score1 = Asi2Score(False, [])
         if score2 is None:
-            score2 = Score(False, [])
+            score2 = Asi2Score(False, [])
 
-        return Score(score1.score or score2.score,
+        return Asi2Score(score1.score or score2.score,
                      score1.residues | score2.residues)
 
 
@@ -132,8 +95,8 @@ class ScoreExpr(DrmExpr):
             return None
 
         if result.score is False:
-            return Score(0, [])
-        return Score(score, result.residues)
+            return Asi2Score(0, [])
+        return Asi2Score(score, result.residues)
 
 
 class ScoreList(DrmExpr):
@@ -152,7 +115,7 @@ class ScoreList(DrmExpr):
         matched_scores = [score.score for score in scores if score.score]
         residues = reduce(lambda x, y: x | y,
                           (score.residues for score in scores))
-        return Score(bool(matched_scores) and func(matched_scores), residues)
+        return Asi2Score(bool(matched_scores) and func(matched_scores), residues)
 
 
 class SelectFrom(DrmExpr):
@@ -170,7 +133,7 @@ class SelectFrom(DrmExpr):
         scored = [f(mutations) for f in rest]
         passing = sum(bool(score.score) for score in scored)
 
-        return Score(operation(passing),
+        return Asi2Score(operation(passing),
                      reduce(lambda x, y: x | y,
                             (item.residues for item in scored)))
 
@@ -182,7 +145,7 @@ class AsiScoreCond(DrmExpr):
 
     def __call__(self, args):
         """Score conditions evaluate a list of expressions and sum scores"""
-        return sum((f(args) for f in self.children), Score(False, set()))
+        return sum((f(args) for f in self.children), Asi2Score(False, set()))
 
 
 class AsiMutations(object):
@@ -202,13 +165,13 @@ class AsiMutations(object):
             is_found |= mutation_set.pos == self.mutations.pos
             intersection = self.mutations.mutations & mutation_set.mutations
             if len(intersection) > 0:
-                return Score(True, intersection)
+                return Asi2Score(True, intersection)
 
         if not is_found:
             # Some required positions were not found in the environment.
             raise MissingPositionError('Missing position {}.'.format(
                 self.mutations.pos))
-        return Score(False, set())
+        return Asi2Score(False, set())
 
 
 class ASI2(DRMParser):
