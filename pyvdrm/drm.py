@@ -148,6 +148,16 @@ class DRMParser(metaclass=ABCMeta):
         """The parser returns a decision tree based on the rule string"""
         pass
 
+    def key_mutations(self):
+        def _recurs(term):
+            if hasattr(term, 'mutations'):
+                return term.mutations
+            else:
+                if issubclass(type(term), DrmExpr):
+                    return [_recurs(m) for m in term.children]
+
+        return _recurs(self.dtree)
+
     def __call__(self, mutations):
         score = self.dtree(mutations)
         if score is None:
