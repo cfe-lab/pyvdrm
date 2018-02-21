@@ -92,6 +92,16 @@ class TestRuleSemantics(unittest.TestCase):
         rule = HCVR("SCORE FROM (MAX (100G => -10, 101D => -20, 102D => 30))")
         self.assertEqual(-10, rule(VariantCalls("100G 101D 102d")))
 
+    def test_score_from_min(self):
+        rule = HCVR("SCORE FROM (MIN (100G => 10, 101D => 20, 102D => 30))")
+        self.assertEqual(rule(VariantCalls("100G 101D 102d")), 10)
+
+    def test_score_from_min_neg(self):
+        rule = HCVR("SCORE FROM (MIN (100G => -10, 101D => -20, 102D => 30))")
+        self.assertEqual(-20, rule(VariantCalls("100G 101D 102d")))
+
+
+
     def test_bool_and(self):
         rule = HCVR("1G AND (2T AND 7Y)")
         self.assertEqual(rule(VariantCalls("2T 7Y 1G")), True)

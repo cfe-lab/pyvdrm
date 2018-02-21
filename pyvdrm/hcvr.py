@@ -170,13 +170,16 @@ class ScoreExpr(AsiExpr):
 
 
 class ScoreList(AsiExpr):
-    """Lists of scores are either summed or maxed"""
+    """Lists of scores are either SUMed, MAXed, or MINed"""
 
     def __call__(self, mutations):
         operation, *rest = self.children
         if operation == 'MAX':
             terms = rest
             func = max
+        elif operation == 'MIN':
+            terms = rest
+            func = min
         else:
             # the default operation is sum
             terms = self.children
@@ -262,10 +265,10 @@ class HCVR(DRMParser):
         from_ = Literal('FROM').suppress()
 
         max_ = Literal('MAX')
+        min_ = Literal('MIN')
 
         and_ = Literal('AND').suppress()
         or_ = Literal('OR').suppress()
-        # min_ = Literal('MIN')
 
         notmorethan = Literal('NOTMORETHAN')
         l_par = Literal('(').suppress()
@@ -283,6 +286,7 @@ class HCVR(DRMParser):
         excludestatement = except_ + residue
 
         quantifier = exactly | atleast | notmorethan
+        tropical = max_ | min_
         inequality = quantifier + integer
         inequality.setParseAction(EqualityExpr)
 
@@ -309,7 +313,7 @@ class HCVR(DRMParser):
         score = Optional(Literal('-')) + integer | quote + Regex(r'[a-zA-Z0-9 _]+') + quote
         scoreitem = booleancondition + mapper + score
         scoreitem.setParseAction(ScoreExpr)
-        scorelist = max_ + l_par + delimitedList(scoreitem) + r_par |\
+        scorelist = tropical + l_par + delimitedList(scoreitem) + r_par |\
             delimitedList(scoreitem)
         scorelist.setParseAction(ScoreList)
 
