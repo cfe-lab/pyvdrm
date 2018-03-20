@@ -1,9 +1,9 @@
 """
-HCV Drug Resistance Rule Parser definition
+HCV Drug Resistance Rule Parser definition, version 2
 """
 
 from functools import reduce, total_ordering
-from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
+from pyparsing import (Literal, nums, Word, Forward, Optional, Regex, Combine,
                        infixNotation, delimitedList, opAssoc, ParseException)
 
 from pyvdrm.drm import MissingPositionError
@@ -252,54 +252,55 @@ class AsiMutations(object):
         return Score(False, set())
 
 
-class HCVR(DRMParser):
-    """HCV Resistance Syntax definition"""
+class HCVR2(DRMParser):
+    """HCV Resistance Syntax definition, version 2"""
 
     def parser(self, rule):
-
+        # literals
         max_ = Literal('MAX')
         min_ = Literal('MIN')
         mean = Literal('MEAN')
 
-        and_ = Literal('AND').suppress() | Literal('&').suppress()
-        or_ = Literal('OR').suppress() | Literal('|').suppress()
+        and_ = Literal('AND').suppress()
+        or_ = Literal('OR').suppress()
 
         l_par = Literal('(').suppress()
         r_par = Literal(')').suppress()
 
         mapper = Literal('=>').suppress()
-        float_ = Word(nums)
 
+        # complex atoms
+        integer = Word(nums)
         residue = Optional(Regex(r'[A-Z]')) + integer + Regex(r'\!?[diA-Z]+')
-        residue.setParseAction(AsiMutations)
+#        residue.setParseAction(AsiMutations)
+        
+        float_ = Combine(Optional(Literal('-')) + integer +\
+                         Optional(Literal('.') + Optional(integer)))
 
-        # Syntax of expressions
         accumulator = max_ | min_ | mean
 
-        expr_list = Optional(accumulator) + l_par + expr + r_par
+        bool_ = (Literal('TRUE').suppress() |
+                 Literal('FALSE').suppress())
 
-        bool_ = (Literal('TRUE').suppress().setParseAction(BoolTrue) |
-                 Literal('FALSE').suppress().setParseAction(BoolFalse))
+        # compound expressions
 
+       
         booleancondition = Forward()
 
-        condition = residue |\
-                    bool_ |\
-                    l_par + booleancondition + r_par |\
-                    l_par + booleancondition + r_par
+        condition = residue | bool_ | l_par + booleancondition + r_par
 
         booleancondition << infixNotation(condition,
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
                                            (or_, 2, opAssoc.LEFT, OrExpr)])
 
-        float_ = Combine(Optional(Literal('-')) +\
-                         Word(nums) +\
-                         Optional(Literal('.' + Optional(Word(nums)))))
+        expr_list = Forward()
+        score = float_ | expr_list
+
         expr = condition + mapper + score
-        score = expr_list | integer
+        expr_list << Optional(accumulator) + l_par + delimitedList(expr) + r_par
 
         try:
-            return statement.parseString(rule)
+            return score.parseString(rule)
         except ParseException as ex:
             ex.msg = 'Error in HCVR: ' + ex.markInputline()
             raise
