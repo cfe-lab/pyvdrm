@@ -91,6 +91,7 @@ class Expr(AsiExpr):
         else:
             return 0.0
 
+
 class AsiMutations(object):
     """List of mutations given an ambiguous pattern"""
 
@@ -144,8 +145,8 @@ class HCVR2(DRMParser):
 
         accumulator = max_ | min_ | mean
 
-        bool_ = (Literal('TRUE').suppress() |
-                 Literal('FALSE').suppress())
+        bool_ = (Literal('TRUE').suppress().setParseAction(BoolTrue) |
+                 Literal('FALSE').suppress().setParseAction(BoolFalse))
 
         # compound expressions
         booleancondition = Forward()
@@ -161,9 +162,11 @@ class HCVR2(DRMParser):
         score = float_ | expr_list
         score.setParseAction(ScoreExpr)
 
-        expr = condition + mapper + score | float_
+        expr = condition + mapper + score | float_ |\
+               condition + mapper + expr_list
         expr.setParseAction(Expr)
-        expr_list << Optional(accumulator) + l_par + delimitedList(expr) + r_par
+        expr_list << Optional(accumulator) + l_par +\
+                delimitedList(expr) + r_par
         expr_list.setParseAction(ExprList)
 
         try:
