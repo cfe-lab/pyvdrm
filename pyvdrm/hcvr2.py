@@ -82,6 +82,9 @@ class Condition(AsiExpr):
 
 class Expr(AsiExpr):
     def __call__(self, mutations):
+        if len(self.children) == 1:
+            return float(self.children[0])
+
         condition, scoreExpr = self.children
         if condition(mutations):
             return scoreExpr(mutations)
@@ -158,7 +161,7 @@ class HCVR2(DRMParser):
         score = float_ | expr_list
         score.setParseAction(ScoreExpr)
 
-        expr = condition + mapper + score
+        expr = condition + mapper + score | float_
         expr.setParseAction(Expr)
         expr_list << Optional(accumulator) + l_par + delimitedList(expr) + r_par
         expr_list.setParseAction(ExprList)

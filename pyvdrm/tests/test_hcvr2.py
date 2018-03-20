@@ -35,3 +35,8 @@ class TestRuleParser(unittest.TestCase):
         r = HCVR2("MEAN (L41L => 3, 67N => (2N => 2)))")
         self.assertEqual(r(VariantCalls("67N 2N L41R")), 1.0)
         self.assertEqual(r(VariantCalls("67N 2N L41L")), 2.5)
+
+    def test_sum_expr(self):
+        r = HCVR2("(0.5, L41L => 3, 67N => (2N => 2))")
+        self.assertEqual(r(VariantCalls("67N 2N L41R")), 2.5)
+        self.assertEqual(r(VariantCalls("67N 2N L41L")), 5.5)
