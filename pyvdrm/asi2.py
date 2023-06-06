@@ -81,7 +81,7 @@ class OrExpr(AsiMultipleExpr):
         for arg in self.children:
             score = arg(mutations)
             if score is not None and score.score:
-                return Score(score.score, score.residues)
+                return score
         else:
             return Score(False, [])
 
