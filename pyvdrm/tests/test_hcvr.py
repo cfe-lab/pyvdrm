@@ -155,7 +155,7 @@ class TestRuleSemantics(unittest.TestCase):
 
     def test_parse_exception(self):
         expected_error_message = (
-            "Error in HCVR: SCORE FROM ( 10R => 2>!<;0 ) (at char 21), (line:1, col:22)")
+            "Error in HCVR: SCORE FROM ( 10R => 2>!<;0 ), found ';'  (at char 21), (line:1, col:22)")
 
         with self.assertRaises(ParseException) as context:
             HCVR("SCORE FROM ( 10R => 2;0 )")
@@ -169,7 +169,7 @@ SCORE FROM (
 )
 """
         expected_error_message = (
-            "Error in HCVR: 10R => 2>!<;0 (at char 25), (line:2, col:13)")
+            "Error in HCVR: 10R => 2>!<;0, found ';'  (at char 25), (line:2, col:13)")
 
         with self.assertRaises(ParseException) as context:
             HCVR(rule)
