@@ -70,7 +70,8 @@ class AsiBinaryExpr(AsiExpr):
 
     def typecheck(self, tokens):
         if len(tokens[0]) != 2:
-            raise AsiParseError
+            pass
+            #raise AsiParseError
 
     def __repr__(self):
         arg1, arg2 = self.children

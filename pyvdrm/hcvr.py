@@ -102,18 +102,12 @@ class OrExpr(AsiBinaryExpr):
     """Boolean OR on children (binary only)"""
 
     def __call__(self, mutations):
-        arg1, arg2 = self.children
-
-        score1 = arg1(mutations)
-        score2 = arg2(mutations)
-
-        if score1 is None:
-            score1 = Score(False, [])
-        if score2 is None:
-            score2 = Score(False, [])
-
-        return Score(score1.score or score2.score,
-                     score1.residues | score2.residues)
+        for arg in self.children:
+            score = arg(mutations)
+            if score is not None:
+                return Score(score.score, score.residues)
+        else:
+            return Score(False, [])
 
 
 class EqualityExpr(AsiExpr):
