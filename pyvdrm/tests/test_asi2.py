@@ -98,6 +98,12 @@ class TestRuleSemantics(unittest.TestCase):
         self.assertFalse(rule(VariantCalls("1d 2d 7d")))
         self.assertTrue(rule(VariantCalls("1G 2d 7d")))
 
+    def test_bool_or_no_brackets(self):
+        rule = ASI2("1G OR 2T OR 7Y")
+        self.assertTrue(rule(VariantCalls("1d 2T 7d")))
+        self.assertFalse(rule(VariantCalls("1d 2d 7d")))
+        self.assertTrue(rule(VariantCalls("1G 2d 7d")))
+
     def test_select_from_atleast(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (2T, 7Y, 3G)")
         self.assertTrue(rule(VariantCalls("2T 7Y 3d")))
@@ -111,7 +117,7 @@ class TestRuleSemantics(unittest.TestCase):
 
     def test_parse_exception(self):
         expected_error_message = (
-            "Error in ASI2: SCORE FROM ( 10R => 2>!<;0 ) (at char 21), (line:1, col:22)")
+            "Error in ASI2: SCORE FROM ( 10R => 2>!<;0 ), found ';'  (at char 21), (line:1, col:22)")
 
         with self.assertRaises(ParseException) as context:
             ASI2("SCORE FROM ( 10R => 2;0 )")
@@ -125,7 +131,7 @@ SCORE FROM (
 )
 """
         expected_error_message = (
-            "Error in ASI2: 10R => 2>!<;0 (at char 25), (line:2, col:13)")
+            "Error in ASI2: 10R => 2>!<;0, found ';'  (at char 25), (line:2, col:13)")
 
         with self.assertRaises(ParseException) as context:
             ASI2(rule)

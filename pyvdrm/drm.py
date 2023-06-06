@@ -61,20 +61,12 @@ class AsiExpr(object):
         return self.children(args)
 
 
-class AsiBinaryExpr(AsiExpr):
+class AsiMultipleExpr(AsiExpr):
     """Subclass with syntactic sugar for boolean ops"""
 
     def __init__(self, label, pos, tokens):
         super().__init__(label, pos, tokens)
         self.children = tokens[0]
-
-    def typecheck(self, tokens):
-        if len(tokens[0]) != 2:
-            raise AsiParseError
-
-    def __repr__(self):
-        arg1, arg2 = self.children
-        return "{} {} {}".format(arg1, type(self), arg2)
 
 
 class AsiUnaryExpr(AsiExpr):

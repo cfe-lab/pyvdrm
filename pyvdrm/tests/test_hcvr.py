@@ -100,8 +100,6 @@ class TestRuleSemantics(unittest.TestCase):
         rule = HCVR("SCORE FROM (MIN (100G => -10, 101D => -20, 102D => 30))")
         self.assertEqual(-20, rule(VariantCalls("100G 101D 102d")))
 
-
-
     def test_bool_and(self):
         rule = HCVR("1G AND (2T AND 7Y)")
         self.assertEqual(rule(VariantCalls("2T 7Y 1G")), True)
@@ -121,6 +119,15 @@ class TestRuleSemantics(unittest.TestCase):
 
     def test_bool_or(self):
         rule = HCVR("1G OR (2T OR 7Y)")
+        self.assertTrue(rule(VariantCalls("1d 2T 7d")))
+        self.assertFalse(rule(VariantCalls("1d 2d 7d")))
+        self.assertTrue(rule(VariantCalls("1G 2d 7d")))
+        with self.assertRaisesRegex(MissingPositionError,
+                                    r"Missing position 1"):
+            rule([])
+
+    def test_bool_or_no_brackets(self):
+        rule = HCVR("1G OR 2T OR 7Y")
         self.assertTrue(rule(VariantCalls("1d 2T 7d")))
         self.assertFalse(rule(VariantCalls("1d 2d 7d")))
         self.assertTrue(rule(VariantCalls("1G 2d 7d")))
@@ -148,7 +155,7 @@ class TestRuleSemantics(unittest.TestCase):
 
     def test_parse_exception(self):
         expected_error_message = (
-            "Error in HCVR: SCORE FROM ( 10R => 2>!<;0 ) (at char 21), (line:1, col:22)")
+            "Error in HCVR: SCORE FROM ( 10R => 2>!<;0 ), found ';'  (at char 21), (line:1, col:22)")
 
         with self.assertRaises(ParseException) as context:
             HCVR("SCORE FROM ( 10R => 2;0 )")
@@ -162,7 +169,7 @@ SCORE FROM (
 )
 """
         expected_error_message = (
-            "Error in HCVR: 10R => 2>!<;0 (at char 25), (line:2, col:13)")
+            "Error in HCVR: 10R => 2>!<;0, found ';'  (at char 25), (line:2, col:13)")
 
         with self.assertRaises(ParseException) as context:
             HCVR(rule)

@@ -5,7 +5,7 @@ ASI2 Parser definition
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
                        infixNotation, delimitedList, opAssoc, ParseException)
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser, MissingPositionError
+from pyvdrm.drm import AsiExpr, AsiMultipleExpr, DRMParser, MissingPositionError
 from pyvdrm.vcf import MutationSet
 
 
@@ -74,22 +74,16 @@ class AndExpr(AsiExpr):
         return Score(True, residues)
 
 
-class OrExpr(AsiBinaryExpr):
-    """Boolean OR on children (binary only)"""
+class OrExpr(AsiMultipleExpr):
+    """Boolean OR on children (not necessarily binary)"""
 
     def __call__(self, mutations):
-        arg1, arg2 = self.children
-
-        score1 = arg1(mutations)
-        score2 = arg2(mutations)
-
-        if score1 is None:
-            score1 = Score(False, [])
-        if score2 is None:
-            score2 = Score(False, [])
-
-        return Score(score1.score or score2.score,
-                     score1.residues | score2.residues)
+        for arg in self.children:
+            score = arg(mutations)
+            if score is not None and score.score:
+                return score
+        else:
+            return Score(False, [])
 
 
 class EqualityExpr(AsiExpr):
