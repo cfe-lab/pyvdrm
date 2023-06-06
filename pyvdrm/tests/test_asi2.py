@@ -98,6 +98,12 @@ class TestRuleSemantics(unittest.TestCase):
         self.assertFalse(rule(VariantCalls("1d 2d 7d")))
         self.assertTrue(rule(VariantCalls("1G 2d 7d")))
 
+    def test_bool_or_no_brackets(self):
+        rule = ASI2("1G OR 2T OR 7Y")
+        self.assertTrue(rule(VariantCalls("1d 2T 7d")))
+        self.assertFalse(rule(VariantCalls("1d 2d 7d")))
+        self.assertTrue(rule(VariantCalls("1G 2d 7d")))
+
     def test_select_from_atleast(self):
         rule = ASI2("SELECT ATLEAST 2 FROM (2T, 7Y, 3G)")
         self.assertTrue(rule(VariantCalls("2T 7Y 3d")))

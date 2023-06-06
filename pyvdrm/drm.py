@@ -77,6 +77,14 @@ class AsiBinaryExpr(AsiExpr):
         return "{} {} {}".format(arg1, type(self), arg2)
 
 
+class AsiMultipleExpr(AsiExpr):
+    """Subclass with syntactic sugar for boolean ops"""
+
+    def __init__(self, label, pos, tokens):
+        super().__init__(label, pos, tokens)
+        self.children = tokens[0]
+
+
 class AsiUnaryExpr(AsiExpr):
     """Subclass for atoms and unary ops"""
 

@@ -7,7 +7,7 @@ from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
                        infixNotation, delimitedList, opAssoc, ParseException)
 
 from pyvdrm.drm import MissingPositionError
-from pyvdrm.drm import AsiExpr, AsiBinaryExpr, DRMParser
+from pyvdrm.drm import AsiExpr, AsiMultipleExpr, DRMParser
 from pyvdrm.vcf import MutationSet
 
 
@@ -98,13 +98,13 @@ class AndExpr(AsiExpr):
         return Score(True, residues)
 
 
-class OrExpr(AsiExpr):
-    """Boolean OR on children (binary only)"""
+class OrExpr(AsiMultipleExpr):
+    """Boolean OR on children (not necessarily binary)"""
 
     def __call__(self, mutations):
         for arg in self.children:
             score = arg(mutations)
-            if score is not None:
+            if score is not None and score.score:
                 return Score(score.score, score.residues)
         else:
             return Score(False, [])

@@ -100,8 +100,6 @@ class TestRuleSemantics(unittest.TestCase):
         rule = HCVR("SCORE FROM (MIN (100G => -10, 101D => -20, 102D => 30))")
         self.assertEqual(-20, rule(VariantCalls("100G 101D 102d")))
 
-
-
     def test_bool_and(self):
         rule = HCVR("1G AND (2T AND 7Y)")
         self.assertEqual(rule(VariantCalls("2T 7Y 1G")), True)
@@ -121,6 +119,15 @@ class TestRuleSemantics(unittest.TestCase):
 
     def test_bool_or(self):
         rule = HCVR("1G OR (2T OR 7Y)")
+        self.assertTrue(rule(VariantCalls("1d 2T 7d")))
+        self.assertFalse(rule(VariantCalls("1d 2d 7d")))
+        self.assertTrue(rule(VariantCalls("1G 2d 7d")))
+        with self.assertRaisesRegex(MissingPositionError,
+                                    r"Missing position 1"):
+            rule([])
+
+    def test_bool_or_no_brackets(self):
+        rule = HCVR("1G OR 2T OR 7Y")
         self.assertTrue(rule(VariantCalls("1d 2T 7d")))
         self.assertFalse(rule(VariantCalls("1d 2d 7d")))
         self.assertTrue(rule(VariantCalls("1G 2d 7d")))
