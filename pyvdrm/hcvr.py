@@ -98,7 +98,7 @@ class AndExpr(AsiExpr):
         return Score(True, residues)
 
 
-class OrExpr(AsiBinaryExpr):
+class OrExpr(AsiExpr):
     """Boolean OR on children (binary only)"""
 
     def __call__(self, mutations):
