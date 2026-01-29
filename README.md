@@ -1,6 +1,4 @@
 # pyvdrm
-[![Build
-Status](https://travis-ci.org/cfe-lab/pyvdrm.svg?branch=master)](https://travis-ci.org/cfe-lab/pyvdrm)
 
 Tools for interpreting drug resistance mutations in viral amino acid sequences
 
