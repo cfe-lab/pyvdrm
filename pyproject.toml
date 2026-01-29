@@ -7,6 +7,7 @@ name = "pyvdrm"
 version = "0.3.1"
 description = "Tools for interpreting drug resistance mutations in viral amino acid sequences"
 readme = "README.md"
+license = "AGPL-3.0"
 authors = [
     { name = "British Columbia Centre for Excellence in HIV/AIDS", email = "vmysak@bccfe.ca" },
 ]
@@ -15,6 +16,7 @@ dependencies = [
     "pyparsing",
 ]
 classifiers = [
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
