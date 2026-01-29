@@ -4,7 +4,7 @@ ASI2 Parser definition
 
 from functools import reduce, total_ordering
 from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
-                       infixNotation, delimitedList, opAssoc, ParseException)
+                       infix_notation, DelimitedList, opAssoc, ParseException)
 from pyvdrm.drm import AsiExpr, AsiMultipleExpr, DRMParser, MissingPositionError
 from pyvdrm.vcf import MutationSet
 
@@ -230,10 +230,10 @@ class ASI2(DRMParser):
         integer = Word(nums)
 
         mutation = Optional(Regex(r'[A-Z]')) + integer + Regex(r'[diA-Z]+')
-        mutation.setParseAction(AsiMutations)
+        mutation.set_parse_action(AsiMutations)
 
         not_ = Literal('NOT').suppress() + mutation
-        not_.setParseAction(Negate)
+        not_.set_parse_action(Negate)
 
         residue = mutation | not_
         # integer + l_par + not_ + Regex(r'[A-Z]+') + r_par
@@ -244,40 +244,39 @@ class ASI2(DRMParser):
 
         quantifier = exactly | atleast | notmorethan
         inequality = quantifier + integer
-        inequality.setParseAction(EqualityExpr)
+        inequality.set_parse_action(EqualityExpr)
 
-        select_quantifier = infixNotation(inequality,
+        select_quantifier = infix_notation(inequality,
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
                                            (or_, 2, opAssoc.LEFT, OrExpr)])
 
-        residue_list = l_par + delimitedList(residue) + r_par
+        residue_list = l_par + DelimitedList(residue) + r_par
 
         # so selectstatement.eval :: [Mutation] -> Maybe Bool
         selectstatement = select + select_quantifier + from_ + residue_list
-        selectstatement.setParseAction(SelectFrom)
-
+        selectstatement.set_parse_action(SelectFrom)
         booleancondition = Forward()
         condition = residue | excludestatement | selectstatement
 
-        booleancondition << infixNotation(condition,
+        booleancondition << infix_notation(condition,
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
                                            (or_, 2, opAssoc.LEFT, OrExpr)]) | condition
 
         scoreitem = booleancondition + mapper + Optional(Literal('-')) + integer
-        scoreitem.setParseAction(ScoreExpr)
-        scorelist = max_ + l_par + delimitedList(scoreitem) + r_par |\
-            delimitedList(scoreitem)
-        scorelist.setParseAction(ScoreList)
+        scoreitem.set_parse_action(ScoreExpr)
+        scorelist = max_ + l_par + DelimitedList(scoreitem) + r_par |\
+            DelimitedList(scoreitem)
+        scorelist.set_parse_action(ScoreList)
 
         scorecondition = Literal('SCORE FROM').suppress() +\
-            l_par + delimitedList(scorelist) + r_par
+            l_par + DelimitedList(scorelist) + r_par
 
-        scorecondition.setParseAction(AsiScoreCond)
+        scorecondition.set_parse_action(AsiScoreCond)
 
         statement = booleancondition | scorecondition
 
         try:
-            return statement.parseString(rule)
+            return statement.parse_string(rule)
         except ParseException as ex:
-            ex.msg = 'Error in ASI2: ' + ex.markInputline()
+            ex.msg = 'Error in ASI2: ' + ex.mark_input_line()
             raise

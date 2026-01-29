@@ -3,8 +3,8 @@ HCV Drug Resistance Rule Parser definition
 """
 
 from functools import reduce, total_ordering
-from pyparsing import (Literal, nums, Word, Forward, Optional, Regex,
-                       infixNotation, delimitedList, opAssoc, ParseException)
+from pyparsing import (DelimitedList, Literal, nums, Word, Forward, Optional, Regex,
+                       infix_notation, opAssoc, ParseException)
 
 from pyvdrm.drm import MissingPositionError
 from pyvdrm.drm import AsiExpr, AsiMultipleExpr, DRMParser
@@ -274,7 +274,7 @@ class HCVR(DRMParser):
         integer = Word(nums)
 
         residue = Optional(Regex(r'[A-Z]')) + integer + Regex(r'\!?[diA-Z]+')
-        residue.setParseAction(AsiMutations)
+        residue.set_parse_action(AsiMutations)
 
         # Syntax of expressions
         excludestatement = except_ + residue
@@ -282,44 +282,44 @@ class HCVR(DRMParser):
         quantifier = exactly | atleast | notmorethan
         tropical = max_ | min_
         inequality = quantifier + integer
-        inequality.setParseAction(EqualityExpr)
+        inequality.set_parse_action(EqualityExpr)
 
-        select_quantifier = infixNotation(inequality,
+        select_quantifier = infix_notation(inequality,
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
                                            (or_, 2, opAssoc.LEFT, OrExpr)])
 
-        residue_list = l_par + delimitedList(residue) + r_par
+        residue_list = l_par + DelimitedList(residue) + r_par
 
         # so selectstatement.eval :: [Mutation] -> Maybe Bool
         selectstatement = select + select_quantifier + from_ + residue_list
-        selectstatement.setParseAction(SelectFrom)
+        selectstatement.set_parse_action(SelectFrom)
 
-        bool_ = (Literal('TRUE').suppress().setParseAction(BoolTrue) |
-                 Literal('FALSE').suppress().setParseAction(BoolFalse))
+        bool_ = (Literal('TRUE').suppress().set_parse_action(BoolTrue) |
+                 Literal('FALSE').suppress().set_parse_action(BoolFalse))
 
         booleancondition = Forward()
         condition = residue | excludestatement | selectstatement | bool_
 
-        booleancondition << infixNotation(condition,
+        booleancondition << infix_notation(condition,
                                           [(and_, 2, opAssoc.LEFT, AndExpr),
                                            (or_, 2, opAssoc.LEFT, OrExpr)]) | condition
 
         score = Optional(Literal('-')) + integer | quote + Regex(r'[a-zA-Z0-9 _]+') + quote
         scoreitem = booleancondition + mapper + score
-        scoreitem.setParseAction(ScoreExpr)
-        scorelist = tropical + l_par + delimitedList(scoreitem) + r_par |\
-            delimitedList(scoreitem)
-        scorelist.setParseAction(ScoreList)
+        scoreitem.set_parse_action(ScoreExpr)
+        scorelist = tropical + l_par + DelimitedList(scoreitem) + r_par |\
+            DelimitedList(scoreitem)
+        scorelist.set_parse_action(ScoreList)
 
         scorecondition = Literal('SCORE FROM').suppress() +\
-            l_par + delimitedList(scorelist) + r_par
+            l_par + DelimitedList(scorelist) + r_par
 
-        scorecondition.setParseAction(AsiScoreCond)
+        scorecondition.set_parse_action(AsiScoreCond)
 
         statement = booleancondition | scorecondition
 
         try:
-            return statement.parseString(rule)
+            return statement.parse_string(rule)
         except ParseException as ex:
-            ex.msg = 'Error in HCVR: ' + ex.markInputline()
+            ex.msg = 'Error in HCVR: ' + ex.mark_input_line()
             raise
